@@ -1,79 +1,149 @@
 # Setup Guide
 
-> **This file is read by the automated evaluation pipeline. Be precise and complete.**
+> This file provides the setup and execution instructions for the Threat Correlation & Forecasting Assistant.
 
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
 
-- [ ] [e.g., Python 3.11+]
-- [ ] [e.g., Node.js 18+]
-- [ ] [e.g., Docker Desktop]
-- [ ] [e.g., An IBM Cloud account with watsonx.ai access]
+- Python 3
+- A modern web browser such as Google Chrome, Microsoft Edge, or Firefox
+- Git (if cloning the repository locally)
+
+The current project does not require Node.js, Docker, PostgreSQL, or an IBM Cloud account for the implemented workflow.
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in the values:
+The current project does not require environment variables or API keys.
 
-```bash
-cp .env.example .env
-```
+The `.env.example` file is kept in the project as part of the submission structure, but no real credentials are required for the current implementation.
 
-| Variable | Description | Required |
-|---|---|---|
-| `WATSONX_API_KEY` | Your IBM watsonx.ai API key | Yes |
-| `WATSONX_PROJECT_ID` | Your watsonx.ai project ID | Yes |
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `SLACK_WEBHOOK_URL` | Slack webhook for alerts | No |
+Do not add passwords, API keys, tokens, or other secrets to the repository.
 
 ## Installation
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/[your-org]/[your-repo].git
-cd [your-repo]
+### 1. Clone the repository
 
-# 2. Install backend dependencies
-[your command — e.g.: pip install -r requirements.txt]
+git clone https://github.com/[your-repository].git
+cd [your-repository]
 
-# 3. Install frontend dependencies (if applicable)
-[your command — e.g.: cd frontend && npm install]
+### 2. Project Structure
 
-# 4. Set up the database (if applicable)
-[your command — e.g.: python manage.py migrate]
-```
+The main project files are located inside the `src/` directory:
+
+src/
+├── index.html
+├── correlate_alerts.py
+├── alerts.csv
+├── final_report.txt
+├── .env.example
+└── README.md
+
+### 3. Python Setup
+
+Make sure Python 3 is installed.
+
+No additional Python package installation is required for the current project unless required by the local implementation.
 
 ## Running the Application
 
-```bash
-# Start the backend
-[your command — e.g.: uvicorn app.main:app --reload]
+### Web Dashboard
 
-# Start the frontend (in a separate terminal, if applicable)
-[your command — e.g.: cd frontend && npm run dev]
-```
+Open the following file from the `src/` directory in a modern web browser:
 
-The application will be available at: `http://localhost:[PORT]`
+src/index.html
+
+The dashboard provides the user interface for viewing the threat correlation and forecasting results.
+
+### Alert Processing
+
+Open a terminal and move into the source directory:
+
+cd src
+
+Run the alert-processing script:
+
+python correlate_alerts.py
+
+If your system uses `python3`, run:
+
+python3 correlate_alerts.py
+
+The script processes the provided alert data and performs the implemented correlation and analysis workflow.
+
+## Input Data
+
+The project uses the following sample alert dataset:
+
+src/alerts.csv
+
+The alert-processing workflow handles the available alert data and supports:
+
+- Alert preprocessing
+- Duplicate handling
+- Timestamp handling
+- Chronological ordering
+- Alert correlation
+- MITRE ATT&CK mapping
+- Risk scoring
+- Knowledge-based forecasting
+- Final reporting
 
 ## Running Tests
 
-```bash
-[your test command — e.g.: pytest tests/ -v]
-```
+No separate automated test suite is currently provided with the project.
 
-## Quick Demo (Optional)
+For basic verification, run the Python processing script:
 
-If you have a demo script or sample data to showcase the project quickly:
+python correlate_alerts.py
 
-```bash
-[e.g.: python demo/seed_demo_data.py]
-[e.g.: open http://localhost:8000/demo]
-```
+and confirm that it completes without errors.
+
+## Quick Demo
+
+For a quick demonstration:
+
+### 1. Open the dashboard
+
+Open `src/index.html` in a modern web browser.
+
+### 2. Process the sample alerts
+
+Open a terminal, move into the `src` directory, and run:
+
+python correlate_alerts.py
+
+### 3. Review the results
+
+Review the generated analysis and report, including:
+
+- Correlated alert activity
+- Attack chains
+- MITRE ATT&CK techniques
+- Risk information
+- Forecasted next techniques
+- Recommended actions
+
+The project sample evaluation demonstrates the correlation workflow using the provided alert dataset.
 
 ## Troubleshooting
 
 | Issue | Solution |
 |---|---|
-| [e.g., `ModuleNotFoundError`] | [e.g., Run `pip install -r requirements.txt` again] |
-| [e.g., Database connection refused] | [e.g., Ensure PostgreSQL is running: `docker compose up db`] |
-| [e.g., watsonx.ai 401 error] | [e.g., Check `WATSONX_API_KEY` in your `.env` file] |
+| `python` command is not recognised | Install Python 3 or try using `python3`. |
+| Dashboard does not open | Make sure `src/index.html` exists and open it using a modern web browser. |
+| Python script does not run | Make sure Python 3 is installed and run the command from the `src` directory. |
+| `alerts.csv` cannot be found | Make sure `alerts.csv` is present inside the `src` directory. |
+| Changes are not visible in the dashboard | Refresh the browser and make sure you are opening the latest `src/index.html` file. |
+| Required project files are missing | Verify that the repository contains the complete `src/` directory and its project files. |
+
+## Expected Result
+
+After successful setup, the Threat Correlation & Forecasting Assistant should provide:
+
+1. A web dashboard for viewing the project results.
+2. Alert preprocessing and correlation functionality.
+3. MITRE ATT&CK technique context.
+4. Explainable risk scoring.
+5. Knowledge-based forecasting of plausible next techniques.
+6. A final BLUF report with important findings and recommended actions.
