@@ -9,11 +9,11 @@
 # =============================================================================
 
 team:
-  name: ""                             # REQUIRED — e.g., "Orion Squad"
-  track: ""                            # REQUIRED — one of: AI | DevOps | Sustainability | Open
+  name: "Techno Wizards"                             # REQUIRED — e.g., "Orion Squad"
+  track: "AI"                            # REQUIRED — one of: AI | DevOps | Sustainability | Open
   lead:
-    name: ""                           # REQUIRED — e.g., "Alice Chen"
-    email: ""                          # REQUIRED — e.g., "alice.chen@ibm.com"
+    name: "Parth Munani"                           # REQUIRED — e.g., "Alice Chen"
+    email: "26dce@charusat.edu.in"                          # REQUIRED — e.g., "alice.chen@ibm.com"
   members:
     - name: ""                         # REQUIRED — Team member 1
       email: ""
@@ -23,25 +23,31 @@ team:
       email: ""
 
 submission:
-  title: ""                            # REQUIRED — Project display name, e.g., "SmartOps Dashboard"
+  title: "Threat Correlation & Forecasting Assistant"                            # REQUIRED — Project display name, e.g., "SmartOps Dashboard"
 
   problem_statement: >                 # REQUIRED — 1-3 sentences. What problem? Who has it?
-    Replace this text with a concise description of the real-world problem
-    your project addresses and who experiences it.
+    Security Operations Centers receive thousands of daily security alerts.
+    Related alerts are often viewed as isolated events, making it difficult
+    for analysts to identify multi-stage attack chains and quickly prioritise
+    the incidents that require immediate attention.
 
   solution_summary: >                  # REQUIRED — 1-3 sentences. What did you build?
-    Replace this text with a clear description of your solution
-    and how it addresses the problem above.
+    Threat Correlation & Forecasting Assistant transforms scattered security
+    alerts into prioritised and explainable attack stories. It preprocesses
+    and correlates alerts using source IP proximity and deterministic time
+    windows, maps suspicious activity to MITRE ATT&CK techniques, calculates
+    technique-weighted risk scores, forecasts plausible next techniques using
+    documented ATT&CK relationships, and generates an actionable BLUF report.
 
   key_features:                        # REQUIRED — List 3 to 5 specific features you implemented
-    - ""                               # e.g., "Real-time pipeline anomaly detection using watsonx.ai"
-    - ""
-    - ""
-    - ""                               # optional 4th
-    - ""                               # optional 5th
+    - "Alert correlation using same source IP and a deterministic 10-minute time window"                               # e.g., "Real-time pipeline anomaly detection using watsonx.ai"
+    - "Alert preprocessing, deduplication, timestamp correction, and chronological ordering"
+    - "MITRE ATT&CK technique mapping"
+    - "Explainable technique-weighted risk scoring"                               # optional 4th
+    - "Knowledge-based forecasting of plausible next attack techniques"                               # optional 5th
 
   tech_stack:
-    languages: []                      # REQUIRED — e.g., ["Python", "TypeScript"]
+    languages: ["Python", "JavaScript", "HTML", "CSS"]                     # REQUIRED — e.g., ["Python", "TypeScript"]
     frameworks: []                     # e.g., ["FastAPI", "React"]
     ibm_technologies: []               # e.g., ["watsonx.ai", "IBM Bob", "IBM Cloud Functions"]
     databases: []                      # e.g., ["PostgreSQL", "Redis"]
