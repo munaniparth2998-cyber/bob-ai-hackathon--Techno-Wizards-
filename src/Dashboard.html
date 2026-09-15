@@ -443,16 +443,6 @@ body {
 .ba-item .bv { font-size: 24px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .ba-item .bk { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
 
-/* ── Quality table rows ──────────────────────────────────────── */
-.quality-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 7px 0; font-size: 12px;
-  border-bottom: 1px solid var(--border2);
-}
-.quality-row:last-child { border-bottom: none; }
-.quality-row .qk { color: var(--text-muted); font-size: 11px; }
-.quality-row .qv { font-weight: 600; color: var(--text); font-family: "Courier New", monospace; font-size: 11px; }
-
 /* ═══════════════════════════════════════════════════════════
    CHAIN OVERVIEW CARDS
    ═══════════════════════════════════════════════════════════ */
@@ -873,10 +863,6 @@ body {
       <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>
       MITRE Mapping
     </a></li>
-    <li><a href="#sec-quality">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1.5 0h3a.5.5 0 0 1 0 1h-3zM11 .5a.5.5 0 0 1 .5-.5h3A1.5 1.5 0 0 1 16 1.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 1-.5-.5zM.5 11a.5.5 0 0 1 .5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 1 0 1h-3A1.5 1.5 0 0 1 0 14.5v-3a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v3a1.5 1.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
-      Data Quality
-    </a></li>
     <li><a href="#sec-about">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
       About
@@ -956,18 +942,6 @@ body {
         <p id="ba-summary" style="font-size:12px;color:var(--text-muted);line-height:1.6;font-style:italic">
           Upload a CSV file to see correlation results.
         </p>
-      </div>
-      <div class="panel" id="sec-quality">
-        <div class="panel-title">Data Quality</div>
-        <div class="quality-row"><span class="qk">Raw alerts loaded</span><span class="qv" id="dq-raw">—</span></div>
-        <div class="quality-row"><span class="qk">Exact duplicates removed</span><span class="qv" id="dq-dupes">—</span></div>
-        <div class="quality-row"><span class="qk">Missing/invalid timestamps removed</span><span class="qv" id="dq-skipped">—</span></div>
-        <div class="quality-row"><span class="qk">Alerts after quality pass</span><span class="qv" id="dq-clean">—</span></div>
-        <div class="quality-row"><span class="qk">Correlated groups produced</span><span class="qv" id="dq-groups">—</span></div>
-        <div class="quality-row"><span class="qk">Benign / noise groups</span><span class="qv" id="dq-benign">—</span></div>
-        <div class="quality-row"><span class="qk">Suspicious groups (standalone)</span><span class="qv" id="dq-suspicious">—</span></div>
-        <div class="quality-row"><span class="qk">Multi-stage attack groups</span><span class="qv" id="dq-multistage">—</span></div>
-        <div class="quality-row"><span class="qk">Correlation window</span><span class="qv">10 min (same IP)</span></div>
       </div>
     </div>
   </section>
@@ -1380,16 +1354,6 @@ function renderDemo() {
     + `<strong>${CHAINS.length} multi-stage attack chains</strong>. `
     + `Correlation reduces 203 raw alerts to 184 correlated groups, `
     + `of which <strong>${CHAINS.length} are multi-stage</strong> and 12 are standalone suspicious.`;
-
-  // Data Quality panel
-  document.getElementById('dq-raw').textContent        = 203;
-  document.getElementById('dq-dupes').textContent      = 0;
-  document.getElementById('dq-skipped').textContent    = 0;
-  document.getElementById('dq-clean').textContent      = 203;
-  document.getElementById('dq-groups').textContent     = 184;
-  document.getElementById('dq-benign').textContent     = 167;
-  document.getElementById('dq-suspicious').textContent = 12;
-  document.getElementById('dq-multistage').textContent = CHAINS.length;
 
   // Chain overview cards
   const overviewEl = document.getElementById('chain-overview');
@@ -1899,16 +1863,6 @@ function renderDashboard(groups, meta) {
     + `<strong>${multiStage.length + suspicious.length} actionable group${(multiStage.length + suspicious.length) !== 1 ? 's' : ''}</strong> `
     + `(${multiStage.length} MULTI-STAGE, ${suspicious.length} SUSPICIOUS). `
     + `${benign.length} benign/noise group${benign.length !== 1 ? 's' : ''} deprioritised automatically.`;
-
-  // ── Data Quality panel ──────────────────────────────────────────
-  document.getElementById('dq-raw').textContent       = rawCount;
-  document.getElementById('dq-dupes').textContent     = duplicatesRemoved;
-  document.getElementById('dq-skipped').textContent   = skippedCount;
-  document.getElementById('dq-clean').textContent     = cleanCount;
-  document.getElementById('dq-groups').textContent    = groups.length;
-  document.getElementById('dq-benign').textContent    = benign.length;
-  document.getElementById('dq-suspicious').textContent= suspicious.length;
-  document.getElementById('dq-multistage').textContent= multiStage.length;
 
   // ── Sort: HIGH first, then MEDIUM, then LOW; within tier by score desc ─
   const sorted = [...groups].sort((a, b) => {
