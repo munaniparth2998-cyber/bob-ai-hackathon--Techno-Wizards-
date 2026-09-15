@@ -1,121 +1,115 @@
-# 🚀 [Your Project Title Here]
+# Threat Correlation & Forecasting Assistant
 
-> ⚠️ **Replace everything in `[ ]` brackets with your actual content before submission.**
+> An explainable security alert analysis solution that converts scattered alerts into prioritized attack stories for SOC analysts.
 
 ---
 
 ## 👥 Team
 
 | Field | Value |
-|---|---|
-| **Team Name** | [Your Team Name] |
-| **Track** | [AI / DevOps / Sustainability / Open] |
-| **Team Lead** | [Name] — [email@ibm.com] |
-| **Members** | [Name 1], [Name 2], [Name 3] |
+| --- | --- |
+| **Team Name** | Techno Wizards |
+| **Track** | AI |
+| **Team Lead** | Parth Munani — 26dce053@charusat.edu.in |
+| **Members** | Pari Desai, Prinsi Babariya, Kartik Jha |
 
 ---
 
 ## 🎯 Problem Statement
 
-> In 2–3 sentences: What problem does your project solve? Who experiences this problem?
+Security Operations Centers (SOCs) receive thousands of security alerts every day, making it difficult for analysts to identify which alerts are connected to a larger attack.
 
-[Describe the real-world problem your project addresses. Be specific about who the user is and what pain point they face.]
+Related alerts are often viewed as separate events, so analysts must manually examine IP addresses, timestamps, and event sequences to understand the complete attack story and prioritize high-risk activity.
 
 ---
 
 ## 💡 Solution
 
-> In 2–3 sentences: What did you build? How does it solve the problem above?
+Threat Correlation & Forecasting Assistant converts scattered security alerts into a prioritized and explainable attack story.
 
-[Describe your solution clearly. Explain the core mechanism — what makes it work.]
+The system preprocesses alerts, correlates related events using source IP and time proximity, maps suspicious activity to MITRE ATT&CK techniques, calculates an explainable risk score, forecasts plausible next techniques using documented ATT&CK relationships, and generates a BLUF (Bottom Line Up Front) report.
 
 ---
 
 ## ✨ Key Features
 
-- **Feature 1:** [Brief description — e.g., "Real-time anomaly detection using watsonx.ai"]
-- **Feature 2:** [Brief description]
-- **Feature 3:** [Brief description]
-- **Feature 4:** [Optional]
-- **Feature 5:** [Optional]
+- **Alert Correlation:** Groups related alerts using the same source IP and a deterministic time window.
+- **MITRE ATT&CK Mapping:** Provides standardized context for observed attacker techniques.
+- **Explainable Risk Scoring:** Uses technique-weighted scores so analysts can understand why activity is considered high or medium risk.
+- **Knowledge-Based Forecasting:** Identifies plausible next techniques using the observed attack sequence and documented MITRE ATT&CK relationships.
+- **BLUF Report:** Summarizes important findings and recommended actions for faster analyst decision-making.
 
 ---
 
 ## 🛠️ Tech Stack
 
 | Category | Technologies |
-|---|---|
-| **Languages** | [e.g., Python, TypeScript] |
-| **Frameworks** | [e.g., FastAPI, React] |
-| **IBM Technologies** | [e.g., watsonx.ai, IBM Bob, IBM Cloud] |
-| **Databases** | [e.g., PostgreSQL, Redis] |
-| **Other** | [e.g., Docker, GitHub Actions] |
+| --- | --- |
+| **Languages** | Python, JavaScript, HTML, CSS |
+| **Frameworks** | None |
+| **IBM Technologies** | None |
+| **Databases** | None |
+| **Other** | Git, GitHub, MITRE ATT&CK |
 
 ---
 
 ## 📁 Repository Structure
 
-```
-├── src/                  # All source code
-├── docs/                 # Written documentation
+├── src/                  # Source code and project data
+├── docs/                 # Project documentation
 │   ├── problem-statement.md
 │   ├── solution-overview.md
 │   ├── architecture.md
 │   └── setup-guide.md
 ├── demo/                 # Demo artifacts
-│   ├── screenshots/      # App screenshots
-│   └── demo-video-link.txt  # Link to demo video
+│   ├── screenshots/
+│   ├── demo-video-link.txt
+│   └── live-demo-url.txt
 ├── presentation/         # Slide deck
-└── submission.yaml       # Structured submission metadata
-```
+└── submission.yaml       # Submission metadata
 
 ---
 
 ## ⚡ How to Run
 
-> **Copy these exact steps from your [`docs/setup-guide.md`](docs/setup-guide.md)**
+For complete setup instructions, see `docs/setup-guide.md`.
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/[your-repo].git
-cd [your-repo]
+1. Open `src/index.html` in a modern web browser to view the dashboard.
+2. Open a terminal and move into the `src` directory.
+3. Run the alert-processing script:
 
-# 2. Install dependencies
-[your install command here]
+python correlate_alerts.py
 
-# 3. Configure environment
-cp .env.example .env
-# Edit .env with your values
+If your system uses Python 3 as `python3`, run:
 
-# 4. Run the project
-[your run command here]
-```
+python3 correlate_alerts.py
+
+The project uses the provided `alerts.csv` sample dataset for the analysis workflow.
 
 ---
 
 ## 🖥️ Demo
 
-| Artifact | Link |
-|---|---|
-| 📹 Demo Video | [See demo/demo-video-link.txt](demo/demo-video-link.txt) |
-| 🌐 Live Demo | [See demo/live-demo-url.txt](demo/live-demo-url.txt) |
-| 🖼️ Screenshots | [See demo/screenshots/](demo/screenshots/) |
-| 📊 Presentation | [See presentation/slides.pdf](presentation/) |
+| Artifact | Location |
+| --- | --- |
+| 📹 **Demo Video** | `demo/demo-video-link.txt` |
+| 🌐 **Live Demo** | `demo/live-demo-url.txt` |
+| 🖼️ **Screenshots** | `demo/screenshots/` |
+| 📊 **Presentation** | `presentation/` |
 
 ---
 
 ## ⚠️ Known Limitations
 
-> Be honest — judges appreciate transparency over overclaiming.
-
-- [Limitation 1: e.g., "Authentication is mocked — not production-ready"]
-- [Limitation 2: e.g., "Only tested on Chrome"]
-- [Limitation 3: e.g., "Feature X is scaffolded but not fully implemented"]
+- Forecasting is knowledge-based and uses documented MITRE ATT&CK relationships; it is not a machine-learning prediction model.
+- Risk scoring is project-defined and inspired by structured CVSS-like principles; it is not official CVSS scoring.
+- The current implementation uses a sample alert dataset and deterministic correlation rules.
+- A live production deployment is not currently provided.
 
 ---
 
 ## 🏅 What We're Most Proud Of
 
-[Tell the judges what part of your submission is strongest and worth paying close attention to.]
+We are most proud of turning fragmented security alerts into a clear and explainable attack story.
 
----
+The solution combines alert correlation, MITRE ATT&CK context, explainable risk scoring, knowledge-based forecasting, and BLUF reporting in one workflow. This helps SOC analysts move from large volumes of scattered alerts toward prioritized and actionable security findings.
