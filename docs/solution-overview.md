@@ -1,41 +1,57 @@
 # Solution Overview
 
-## What We Built
+## Overview
 
-[Describe your solution in plain language. Avoid jargon — write as if explaining to a smart colleague unfamiliar with your tech stack.]
+Threat Correlation & Forecasting Assistant converts scattered security alerts into a prioritized and explainable attack story for SOC analysts.
 
-## How It Works
+The system processes raw alerts, cleans and validates the data, correlates related alerts, maps suspicious activity to MITRE ATT&CK techniques, calculates an explainable risk score, forecasts plausible next techniques, and produces an actionable BLUF (Bottom Line Up Front) report.
 
-[Explain the core mechanism step by step. A numbered list or simple flow works well here.]
+## How the Solution Works
 
-1. [Step 1: e.g., "User connects their GitHub repository via OAuth"]
-2. [Step 2: e.g., "The system ingests pipeline logs and feeds them to watsonx.ai"]
-3. [Step 3: e.g., "An anomaly score is computed and displayed on the dashboard"]
-4. [Step 4: e.g., "Alerts are sent to Slack when the score exceeds a threshold"]
+The solution follows a deterministic processing pipeline:
 
-## Architecture Diagram
+Raw Alerts → Preprocessing → Correlation → MITRE ATT&CK → Risk Score → Forecast → BLUF Report
 
-> See [`architecture.md`](architecture.md) for the detailed diagram.
+### 1. Alert Preprocessing
 
-[Optionally include a simple ASCII or Mermaid diagram here for quick reference.]
+The system cleans and validates incoming alert data. Duplicate alerts are removed, corrupt timestamps are handled, and events are ordered chronologically.
 
-```
-[User] → [Frontend: React] → [API: FastAPI] → [watsonx.ai] → [Dashboard]
-                                    ↓
-                             [PostgreSQL DB]
-```
+### 2. Alert Correlation
 
-## Key Design Decisions
+Related alerts are grouped using the same source IP and a close time window. The core rule is:
 
-| Decision | Rationale |
-|---|---|
-| [e.g., Used watsonx.ai for anomaly detection] | [e.g., Pre-trained models reduced time-to-value vs. building from scratch] |
-| [Decision 2] | [Rationale 2] |
-| [Decision 3] | [Rationale 3] |
+Same Source IP + Close Time Window = Related Activity
 
-## IBM Technologies Used
+This converts fragmented alerts into a coherent attack timeline.
 
-[Explain specifically HOW you used each IBM technology — not just that you used it.]
+### 3. MITRE ATT&CK Mapping
 
-- **[IBM Tech 1, e.g., watsonx.ai]:** [How it was used — e.g., "Used the `ibm/granite-13b-instruct-v2` model via the Python SDK to classify anomaly types from log text."]
-- **[IBM Tech 2]:** [How it was used]
+Suspicious activities are mapped to standardized MITRE ATT&CK techniques. This provides a common framework for understanding attacker behavior.
+
+### 4. Explainable Risk Scoring
+
+The system assigns technique-weighted point scores to the observed attack chain. Higher-impact techniques contribute higher scores, making the reason for the overall risk level transparent to analysts.
+
+The risk score is project-defined and is inspired by structured CVSS-like principles; it is not official CVSS.
+
+### 5. Knowledge-Based Forecasting
+
+The system uses the observed chronological attack chain and documented MITRE ATT&CK relationships to identify plausible next techniques.
+
+This is knowledge-based forecasting, not machine-learning prediction. The system does not create fabricated confidence percentages.
+
+### 6. BLUF Report
+
+Finally, the system produces a Bottom Line Up Front report containing the important findings and recommended action so that analysts can quickly understand and respond to the threat.
+
+## What Makes the Solution Different
+
+Instead of treating alerts as isolated events, the solution combines correlation, MITRE ATT&CK context, explainable risk scoring, and knowledge-based forecasting into one workflow.
+
+The approach is deterministic and transparent, allowing analysts to understand why alerts were grouped, why a risk score was assigned, and why a particular next technique was considered plausible.
+
+## User Experience
+
+The user provides security alert data through the application. The system processes the alerts and presents the resulting attack chains, MITRE techniques, risk scores, forecasted activity, and recommended actions through the dashboard and final report.
+
+The goal is to help SOC analysts move from scattered alerts to a prioritized threat story with less manual investigation.
