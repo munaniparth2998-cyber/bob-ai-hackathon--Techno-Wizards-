@@ -1,0 +1,2151 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  Threat Correlation & Forecasting Dashboard
+  All values sourced from: alerts.csv → correlate_alerts.py pipeline
+  MAX_SCORE = 28  (T1595=2 + T1110=5 + T1098=7 + T1048=8 + T1498=6)
+  Explainable risk-prioritization score — NOT CVSS.
+  No ML model used. Open directly in browser — fully self-contained.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threat Correlation Dashboard</title>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   DESIGN TOKENS — SOC dark-navy theme
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --bg:         #0b0f14;
+  --surface:    #141920;
+  --surface2:   #1a2030;
+  --border:     #252d3a;
+  --border2:    #1e2534;
+  --text:       #e2eaf4;
+  --text-muted: #7d8fa3;
+  --text-dim:   #3d4a5a;
+  --accent:     #2f81f7;
+  --accent-dim: #152848;
+  --red:        #f85149;
+  --red-dim:    #311518;
+  --amber:      #e3a008;
+  --amber-dim:  #2e1f04;
+  --green:      #3fb950;
+  --green-dim:  #0b2211;
+  --purple:     #a371f7;
+  --purple-dim: #21194a;
+  --nav-w:      220px;
+  --topnav-h:   62px;
+  --radius:     8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════════════════
+   TOP NAV / HERO BAR
+   ═══════════════════════════════════════════════════════════ */
+.topnav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--topnav-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 0;
+  z-index: 200;
+}
+/* ── Left: shield icon + title block ── */
+.topnav-logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-shrink: 0;
+  padding-right: 18px;
+}
+/* Shield icon wrapper — left accent rule */
+.topnav-shield-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(47,129,247,.3);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.topnav-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.topnav-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  line-height: 1;
+}
+.topnav-title span { color: var(--accent); }
+.topnav-subtitle {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0px;
+  line-height: 1;
+}
+/* ── Divider ── */
+.topnav-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  flex-shrink: 0;
+  margin: 0 16px;
+}
+/* ── Centre spacer ── */
+.topnav-spacer { flex: 1; }
+/* ── Right controls ── */
+.topnav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+/* Dataset status pill */
+.topnav-dataset {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  max-width: 280px;
+}
+.topnav-dataset .ds-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+  transition: background .3s;
+}
+.topnav-dataset.loaded .ds-dot { background: var(--green); box-shadow: 0 0 0 3px var(--green-dim); }
+.topnav-dataset.loaded { border-color: #1a4a28; color: var(--text); }
+.topnav-dataset .ds-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Upload button */
+.topnav-upload-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 6px 14px;
+  transition: background .15s, border-color .15s, opacity .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.1px;
+}
+.topnav-upload-label:hover { opacity: .85; }
+.topnav-upload-label input[type="file"] { display: none; }
+/* PoC badge */
+.poc-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 3px 7px;
+}
+/* Clock */
+#live-clock {
+  font-size: 11px;
+  font-family: "Courier New", monospace;
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  padding: 0 4px;
+}
+/* Hidden csv-status (kept for JS compatibility) */
+#csv-status { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════
+   LEFT SIDEBAR
+   ═══════════════════════════════════════════════════════════ */
+.sidebar {
+  position: fixed;
+  top: var(--topnav-h);
+  left: 0;
+  bottom: 0;
+  width: var(--nav-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-section {
+  padding: 20px 16px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sidebar-nav { list-style: none; padding: 4px 8px 12px; }
+.sidebar-nav li a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: background .12s, color .12s;
+  border-radius: 6px;
+  margin-bottom: 2px;
+}
+.sidebar-nav li a:hover { background: var(--surface2); color: var(--text); }
+.sidebar-nav li a.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+.sidebar-nav li a svg { flex-shrink: 0; opacity: .65; }
+.sidebar-nav li a.active svg { opacity: 1; }
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border2);
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  font-family: "Courier New", monospace;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN CONTENT AREA
+   ═══════════════════════════════════════════════════════════ */
+.main-content {
+  margin-left: var(--nav-w);
+  padding-top: var(--topnav-h);
+  min-height: 100vh;
+}
+.content-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 28px 72px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PIPELINE STRIP
+   ═══════════════════════════════════════════════════════════ */
+.pipeline-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 20px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+  overflow: hidden;
+}
+.pipe-step {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  padding: 9px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pipe-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.pipe-arrow {
+  color: var(--border);
+  font-size: 14px;
+  padding: 0 6px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION HEADINGS
+   ═══════════════════════════════════════════════════════════ */
+.section-heading {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-heading::before {
+  content: '';
+  display: inline-block;
+  width: 3px; height: 12px;
+  background: var(--accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SUMMARY STAT CARDS
+   ═══════════════════════════════════════════════════════════ */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 32px;
+}
+@media (max-width: 1000px) { .summary-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px)  { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 16px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+  border-top-width: 2px;
+}
+.stat-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+}
+/* Per-color top accent */
+.stat-card.card-blu { border-top-color: var(--accent); }
+.stat-card.card-pur { border-top-color: var(--purple); }
+.stat-card.card-red { border-top-color: var(--red); }
+.stat-card.card-ora { border-top-color: var(--amber); }
+
+.stat-card-icon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+.stat-card .num {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.8px;
+  font-variant-numeric: tabular-nums;
+}
+.stat-card .lbl {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 5px;
+  line-height: 1.3;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+/* colour variants */
+.num-red  { color: var(--red); }
+.num-ora  { color: var(--amber); }
+.num-grn  { color: var(--green); }
+.num-blu  { color: var(--accent); }
+.num-pur  { color: var(--purple); }
+.icon-red    { background: var(--red-dim);   }
+.icon-amber  { background: var(--amber-dim); }
+.icon-green  { background: var(--green-dim); }
+.icon-blue   { background: var(--accent-dim);}
+.icon-purple { background: var(--purple-dim); }
+
+/* ═══════════════════════════════════════════════════════════
+   TWO-COL LAYOUT & PANELS
+   ═══════════════════════════════════════════════════════════ */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+@media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+.panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border2);
+}
+
+/* ── Before/After mini-stats ─────────────────────────────────── */
+.ba-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.ba-item {
+  text-align: center; padding: 14px 8px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+}
+.ba-item .bv { font-size: 24px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ba-item .bk { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
+
+/* ── Quality table rows ──────────────────────────────────────── */
+.quality-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; font-size: 12px;
+  border-bottom: 1px solid var(--border2);
+}
+.quality-row:last-child { border-bottom: none; }
+.quality-row .qk { color: var(--text-muted); font-size: 11px; }
+.quality-row .qv { font-weight: 600; color: var(--text); font-family: "Courier New", monospace; font-size: 11px; }
+
+/* ═══════════════════════════════════════════════════════════
+   CHAIN OVERVIEW CARDS
+   ═══════════════════════════════════════════════════════════ */
+.chain-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 32px;
+}
+@media (max-width: 760px) { .chain-grid { grid-template-columns: 1fr; } }
+
+.chain-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: box-shadow .2s, border-color .2s;
+  border-left-width: 3px;
+}
+.chain-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,.5); border-color: rgba(47,129,247,.3); }
+.chain-card.risk-high   { border-left-color: var(--red); }
+.chain-card.risk-medium { border-left-color: var(--amber); }
+.chain-card.risk-low    { border-left-color: var(--green); }
+
+.chain-card-top {
+  background: var(--surface2);
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border2);
+}
+.chain-ip {
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+  letter-spacing: 0.2px;
+}
+
+/* badge */
+.badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.badge-high   { background: rgba(248,81,73,.12);  color: var(--red);   border: 1px solid rgba(248,81,73,.35); }
+.badge-medium { background: rgba(227,160,8,.12);  color: var(--amber); border: 1px solid rgba(227,160,8,.35); }
+.badge-low    { background: rgba(63,185,80,.12);  color: var(--green); border: 1px solid rgba(63,185,80,.35); }
+
+/* meta row */
+.chain-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid var(--border2);
+}
+.chain-meta-item {
+  padding: 10px 12px;
+  border-right: 1px solid var(--border2);
+  text-align: center;
+}
+.chain-meta-item:last-child { border-right: none; }
+.chain-meta-item .mv { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chain-meta-item .mk { font-size: 9px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-dim); margin-top: 3px; }
+
+/* score bar */
+.score-bar-row { padding: 10px 16px 12px; }
+.score-label   { font-size: 10px; color: var(--text-dim); margin-bottom: 6px; display: flex; justify-content: space-between; letter-spacing: 0.2px; }
+.score-track   { background: var(--surface2); border-radius: 3px; height: 5px; overflow: hidden; border: 1px solid var(--border2); }
+.score-fill    { height: 100%; background: var(--red); border-radius: 3px; transition: width .5s ease; }
+.risk-medium .score-fill { background: var(--amber); }
+.risk-low    .score-fill { background: var(--green); }
+
+/* ═══════════════════════════════════════════════════════════
+   TECHNIQUE CHAIN (COMPACT STEP BADGES)
+   ═══════════════════════════════════════════════════════════ */
+.tech-chain {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+  padding: 10px 14px 12px;
+}
+.tech-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 10px;
+  text-align: center;
+  min-width: 90px;
+  transition: border-color .15s, background .15s;
+}
+.tech-box:hover { border-color: var(--accent); background: var(--accent-dim); }
+.tech-box .tc { font-size: 10px; font-weight: 700; color: var(--accent); font-family: "Courier New", monospace; letter-spacing: 0.5px; }
+.tech-box .tn { font-size: 10px; color: var(--text); margin-top: 2px; line-height: 1.3; }
+.tech-box .tt { font-size: 9px; color: var(--text-dim); margin-top: 2px; font-family: "Courier New", monospace; }
+.arrow { color: var(--accent); opacity: .4; font-size: 14px; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════════════
+   FULL DETAIL CARDS
+   ═══════════════════════════════════════════════════════════ */
+.full-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+  border-left-width: 3px;
+}
+.full-card.risk-high   { border-left-color: var(--red); }
+.full-card.risk-medium { border-left-color: var(--amber); }
+.full-card.risk-low    { border-left-color: var(--green); }
+
+.full-card-header {
+  background: var(--surface2);
+  padding: 13px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border2);
+}
+.full-card-header .ip {
+  font-family: "Courier New", monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+  letter-spacing: 0.3px;
+}
+.full-card-header .score-chip {
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 9px;
+}
+.full-card-body { padding: 0; }
+
+/* ── Flow section rows ───────────────────────────────────────── */
+.flow-section {
+  padding: 15px 22px 16px;
+  border-bottom: 1px solid var(--border2);
+}
+.flow-section:last-child { border-bottom: none; }
+.flow-section-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+.flow-step-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; min-width: 18px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(47,129,247,.3);
+  border-radius: 50%;
+  font-size: 9px; font-weight: 700; color: var(--accent);
+  flex-shrink: 0;
+}
+.flow-step-title {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.1px;
+  text-transform: uppercase; color: var(--text-dim);
+  flex: 1;
+}
+.flow-step-meta {
+  font-size: 9px; color: var(--text-dim); font-style: italic;
+}
+
+/* ── Step 1: What happened ───────────────────────────────────── */
+.bottom-line-box {
+  background: rgba(227,160,8,.05);
+  border: 1px solid rgba(227,160,8,.18);
+  border-left: 3px solid var(--amber);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #c8b472;
+  line-height: 1.75;
+}
+
+/* ── Step 2: Technique chain ─────────────────────────────────── */
+.chain-step-wrap {
+  display: flex; align-items: flex-start; flex-wrap: wrap; gap: 4px;
+}
+.chain-step-box {
+  display: flex; flex-direction: column; align-items: center;
+}
+.chain-step-tactic {
+  font-size: 8px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 3px; text-align: center; white-space: nowrap;
+}
+.chain-step-arrow {
+  color: var(--accent); opacity: .35; font-size: 14px;
+  align-self: center; padding: 0 2px; margin-top: 16px; flex-shrink: 0;
+}
+
+/* ── Step 3: Score + Evidence ────────────────────────────────── */
+.score-evidence-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 700px) { .score-evidence-row { grid-template-columns: 1fr; } }
+
+.score-bar-block { margin-bottom: 14px; }
+.score-bar-inline-label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 10px; color: var(--text-dim); margin-bottom: 6px;
+}
+.score-bar-inline-label strong { color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* ── Score table ─────────────────────────────────────────────── */
+.score-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.score-table td { padding: 5px 8px; border-bottom: 1px solid var(--border2); }
+.score-table tr:last-child td { border-bottom: none; }
+.score-table .code { font-family: "Courier New", monospace; color: var(--accent); font-weight: 700; width: 60px; }
+.score-table .pts  { font-weight: 700; color: var(--green); text-align: right; width: 46px; }
+.score-table .desc { color: var(--text-muted); }
+.score-table .total-row td { border-top: 1px solid var(--border); padding-top: 7px; font-weight: 700; color: var(--text); }
+
+/* ── Corr evidence ───────────────────────────────────────────── */
+.corr-ev { font-size: 10px; }
+.corr-ev .ck { color: var(--text-muted); display: inline-block; width: 155px; }
+.corr-ev .cv { font-weight: 600; color: var(--text); font-family: "Courier New", monospace; }
+.corr-ev li  { padding: 4px 0; border-bottom: 1px solid var(--border2); }
+.corr-ev li:last-child { border-bottom: none; }
+
+/* ── Step 4 + 5: Forecast + Actions 2-col ───────────────────── */
+.forecast-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 700px) { .forecast-actions-row { grid-template-columns: 1fr; } }
+.fa-col-title {
+  font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border2);
+}
+
+/* ── Forecast ────────────────────────────────────────────────── */
+.forecast-not-ml { font-size: 9px; color: var(--text-dim); font-style: italic; margin-bottom: 10px; }
+.forecast-why  { font-size: 11px; font-style: italic; color: var(--text-dim); margin-bottom: 12px; border-left: 2px solid var(--border); padding-left: 10px; line-height: 1.65; }
+.forecast-item {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 9px 12px;
+  margin-bottom: 8px;
+}
+.forecast-item-technique {
+  font-size: 10px; font-weight: 700; color: var(--accent);
+  font-family: "Courier New", monospace; margin-bottom: 4px; letter-spacing: 0.3px;
+}
+.forecast-item-text { font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+.forecast-src  { font-size: 9px; color: var(--text-dim); margin-top: 4px; }
+
+/* ── Action list ─────────────────────────────────────────────── */
+.action-list { list-style: none; }
+.action-list li {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 0; font-size: 11px;
+  border-bottom: 1px solid var(--border2);
+  color: var(--text-muted); line-height: 1.65;
+}
+.action-list li:last-child { border-bottom: none; }
+.action-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; min-width: 18px;
+  background: var(--green-dim);
+  border: 1px solid rgba(63,185,80,.3);
+  border-radius: 4px;
+  font-size: 9px; font-weight: 700; color: var(--green);
+  flex-shrink: 0; margin-top: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EMPTY / NO-DATA STATE
+   ═══════════════════════════════════════════════════════════ */
+.no-data-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 48px 24px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: 32px;
+}
+.no-data-banner svg { opacity: .35; }
+.no-data-banner p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 420px;
+}
+.no-data-banner p strong { color: var(--text); }
+.demo-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  transition: background .12s, color .12s, border-color .12s;
+  letter-spacing: 0.3px;
+}
+.demo-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--text-dim); }
+
+/* ═══════════════════════════════════════════════════════════
+   LOADING OVERLAY
+   ═══════════════════════════════════════════════════════════ */
+#loading-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(11,15,20,.9);
+  z-index: 999;
+  align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+}
+#loading-overlay.visible { display: flex; }
+.spinner {
+  width: 32px; height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading-overlay p { font-size: 12px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* ═══════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════ */
+.site-footer {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.8;
+}
+.site-footer p { margin-bottom: 8px; }
+.site-footer strong { color: var(--text); }
+.site-footer .made { text-align: center; color: var(--text-dim); font-size: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border2); letter-spacing: 0.3px; }
+
+/* ── Responsive: collapse sidebar on small screens ───────────── */
+@media (max-width: 860px) {
+  :root { --nav-w: 0px; }
+  .sidebar { display: none; }
+  .main-content { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay"><div class="spinner"></div><p>Processing CSV…</p></div>
+
+<!-- TOP NAV / HERO BAR -->
+<nav class="topnav">
+  <!-- Left: shield icon + identity -->
+  <div class="topnav-logo">
+    <div class="topnav-shield-wrap">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" fill="#2f81f7" opacity=".25"/>
+        <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" stroke="#2f81f7" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M9 12l2 2 4-4" stroke="#2f81f7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="topnav-title-block">
+      <span class="topnav-title">Threat Correlation &amp; <span>Forecasting Assistant</span></span>
+      <span class="topnav-subtitle">Rule-based correlation · MITRE ATT&amp;CK mapping · Explainable risk scoring</span>
+    </div>
+  </div>
+  <div class="topnav-divider"></div>
+  <div class="topnav-spacer"></div>
+  <!-- Right: dataset status + upload + clock + badge -->
+  <div class="topnav-right">
+    <div class="topnav-dataset" id="topnav-dataset">
+      <span class="ds-dot"></span>
+      <span class="ds-label" id="ds-label-text">No dataset loaded</span>
+    </div>
+    <label class="topnav-upload-label">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+      Upload Alerts CSV
+      <input type="file" id="csv-file-input" accept=".csv">
+    </label>
+    <span id="live-clock"></span>
+    <span class="poc-badge">PoC</span>
+  </div>
+</nav>
+
+<!-- LEFT SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-section">Navigation</div>
+  <ul class="sidebar-nav">
+    <li><a href="#sec-overview" class="active">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h7v7H0V0zm9 0h7v7H9V0zm0 9h7v7H9V9zM0 9h7v7H0V9z"/></svg>
+      Overview
+    </a></li>
+    <li><a href="#sec-chains">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+      Attack Chains
+    </a></li>
+    <li><a href="#sec-mitre">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>
+      MITRE Mapping
+    </a></li>
+    <li><a href="#sec-quality">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 1a.5.5 0 0 0-.5.5v3a.5.5 0 0 1-1 0v-3A1.5 1.5 0 0 1 1.5 0h3a.5.5 0 0 1 0 1h-3zM11 .5a.5.5 0 0 1 .5-.5h3A1.5 1.5 0 0 1 16 1.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 1-.5-.5zM.5 11a.5.5 0 0 1 .5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 1 0 1h-3A1.5 1.5 0 0 1 0 14.5v-3a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v3a1.5 1.5 0 0 1-1.5 1.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 1 .5-.5z"/></svg>
+      Data Quality
+    </a></li>
+    <li><a href="#sec-about">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
+      About
+    </a></li>
+  </ul>
+  <div class="sidebar-bottom">MAX_SCORE = 28<br>Rule-based · No ML<br>Self-contained HTML</div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+<div class="content-inner">
+
+  <!-- (csv-status kept hidden for JS compatibility) -->
+  <span id="csv-status" style="display:none"></span>
+
+  <!-- Pipeline strip -->
+  <div class="pipeline-bar">
+    <span class="pipe-step"><span class="pipe-step-num">1</span>Raw Alerts</span><span class="pipe-arrow">›</span>
+    <span class="pipe-step"><span class="pipe-step-num">2</span>Correlation</span><span class="pipe-arrow">›</span>
+    <span class="pipe-step"><span class="pipe-step-num">3</span>MITRE ATT&amp;CK</span><span class="pipe-arrow">›</span>
+    <span class="pipe-step"><span class="pipe-step-num">4</span>Risk Scoring</span><span class="pipe-arrow">›</span>
+    <span class="pipe-step"><span class="pipe-step-num">5</span>Explainability</span><span class="pipe-arrow">›</span>
+    <span class="pipe-step"><span class="pipe-step-num">6</span>KB Forecast</span><span class="pipe-arrow">›</span>
+    <span class="pipe-step"><span class="pipe-step-num">7</span>Action</span>
+  </div>
+
+  <!-- SECTION: OVERVIEW -->
+  <section id="sec-overview">
+    <div class="section-heading">
+      Summary
+      <span id="summary-file-tag" style="display:none;margin-left:auto;font-size:10px;font-weight:600;font-family:'Courier New',monospace;color:var(--accent);letter-spacing:0.3px;text-transform:none;background:var(--accent-dim);border:1px solid rgba(47,129,247,.4);border-radius:4px;padding:2px 9px"></span>
+    </div>
+    <div class="summary-grid">
+      <div class="stat-card card-blu">
+        <div class="stat-card-icon icon-blue"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--accent)"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z"/></svg></div>
+        <div class="num num-blu" id="stat-raw">—</div>
+        <div class="lbl">Total Raw Alerts</div>
+      </div>
+      <div class="stat-card card-blu">
+        <div class="stat-card-icon icon-blue"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--accent)"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg></div>
+        <div class="num num-blu" id="stat-clean">—</div>
+        <div class="lbl">Alerts After Cleaning</div>
+      </div>
+      <div class="stat-card card-pur">
+        <div class="stat-card-icon icon-purple"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--purple)"><path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/></svg></div>
+        <div class="num num-pur" id="stat-groups">—</div>
+        <div class="lbl">Correlated Groups</div>
+      </div>
+      <div class="stat-card card-red">
+        <div class="stat-card-icon icon-red"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--red)"><path d="M12 1a1 1 0 0 1 1 1v6.5a.5.5 0 0 1-.777.416L10 7.101V9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h9zM3 2v7h6V2H3zm7.5 2.843a.5.5 0 0 1 .777-.416L12 5.528V2.472l-1.723 1.101a.5.5 0 0 1-.777-.416V2H3v7h6V7.528a.5.5 0 0 1 .777-.416L12 8.528V6.472l-1.723 1.1a.5.5 0 0 1-.777-.415V4.843z"/></svg></div>
+        <div class="num num-red" id="stat-chains">—</div>
+        <div class="lbl">Multi-Stage Chains</div>
+      </div>
+      <div class="stat-card card-ora">
+        <div class="stat-card-icon icon-amber"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--amber)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg></div>
+        <div class="num" id="stat-risk">—</div>
+        <div class="lbl">Risk Breakdown</div>
+      </div>
+      <div class="stat-card card-ora">
+        <div class="stat-card-icon icon-amber"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--amber)"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4H7.5V1.077zM4.09 4a9.267 9.267 0 0 1 .64-1.539 6.7 6.7 0 0 1 .597-.933A7.025 7.025 0 0 0 2.255 4H4.09zm-.582 3.5c.03-.877.138-1.718.312-2.5H1.674a6.958 6.958 0 0 0-.656 2.5h2.49zM4.847 5a12.5 12.5 0 0 0-.338 2.5H7.5V5H4.847zM8.5 5v2.5h2.99a12.495 12.495 0 0 0-.337-2.5H8.5zM4.51 8.5a12.5 12.5 0 0 0 .337 2.5H7.5V8.5H4.51zm3.99 0V11h2.653c.187-.765.306-1.608.338-2.5H8.5zM5.145 12c.138.386.295.744.468 1.068.552 1.035 1.218 1.65 1.887 1.855V12H5.145zm.182 2.472a6.696 6.696 0 0 1-.597-.933A9.268 9.268 0 0 1 4.09 12H2.255a7.024 7.024 0 0 0 3.072 2.472zM3.82 11a13.652 13.652 0 0 1-.312-2.5h-2.49c.062.89.291 1.733.656 2.5H3.82zm6.853 3.472A7.024 7.024 0 0 0 13.745 12H11.91a9.27 9.27 0 0 1-.64 1.539 6.688 6.688 0 0 1-.597.933zM8.5 12v2.923c.67-.204 1.335-.82 1.887-1.855.173-.324.33-.682.468-1.068H8.5zm3.68-1h2.146c.365-.767.594-1.61.656-2.5h-2.49a13.65 13.65 0 0 1-.312 2.5zm2.802-3.5a6.959 6.959 0 0 0-.656-2.5H12.18c.174.782.282 1.623.312 2.5h2.49zM11.27 2.461c.247.464.462.98.64 1.539h1.835a7.024 7.024 0 0 0-3.072-2.472c.218.284.418.598.597.933zM10.855 4a7.966 7.966 0 0 0-.468-1.068C9.835 1.897 9.17 1.282 8.5 1.077V4h2.355z"/></svg></div>
+        <div class="num num-ora" id="stat-ips">—</div>
+        <div class="lbl">Unique Attacker IPs</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION: MITRE MAPPING + DATA QUALITY -->
+  <section id="sec-mitre">
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Correlation Value — Before vs After</div>
+        <div class="ba-grid">
+          <div class="ba-item"><div class="bv num-blu" id="ba-raw">—</div><div class="bk">Raw Alerts</div></div>
+          <div class="ba-item"><div class="bv num-pur" id="ba-groups">—</div><div class="bk">Correlated Groups</div></div>
+          <div class="ba-item"><div class="bv num-red" id="ba-chains">—</div><div class="bk">Attack Chains</div></div>
+        </div>
+        <p id="ba-summary" style="font-size:12px;color:var(--text-muted);line-height:1.6;font-style:italic">
+          Upload a CSV file to see correlation results.
+        </p>
+      </div>
+      <div class="panel" id="sec-quality">
+        <div class="panel-title">Data Quality</div>
+        <div class="quality-row"><span class="qk">Raw alerts loaded</span><span class="qv" id="dq-raw">—</span></div>
+        <div class="quality-row"><span class="qk">Exact duplicates removed</span><span class="qv" id="dq-dupes">—</span></div>
+        <div class="quality-row"><span class="qk">Missing/invalid timestamps removed</span><span class="qv" id="dq-skipped">—</span></div>
+        <div class="quality-row"><span class="qk">Alerts after quality pass</span><span class="qv" id="dq-clean">—</span></div>
+        <div class="quality-row"><span class="qk">Correlated groups produced</span><span class="qv" id="dq-groups">—</span></div>
+        <div class="quality-row"><span class="qk">Benign / noise groups</span><span class="qv" id="dq-benign">—</span></div>
+        <div class="quality-row"><span class="qk">Suspicious groups (standalone)</span><span class="qv" id="dq-suspicious">—</span></div>
+        <div class="quality-row"><span class="qk">Multi-stage attack groups</span><span class="qv" id="dq-multistage">—</span></div>
+        <div class="quality-row"><span class="qk">Correlation window</span><span class="qv">10 min (same IP)</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION: ATTACK CHAINS -->
+  <section id="sec-chains">
+    <div class="section-heading">Attack Chains — Overview</div>
+    <div class="chain-grid" id="chain-overview"></div>
+    <div class="section-heading" id="sec-detail-heading" style="margin-top:8px">Detailed Threat Reports</div>
+    <div id="chain-detail"></div>
+  </section>
+
+  <!-- SECTION: ABOUT -->
+  <section id="sec-about">
+    <div class="site-footer">
+      <p><strong>Methodology:</strong> Proof-of-concept. Rule-based temporal correlation (10-minute sliding window per source IP), MITRE ATT&amp;CK technique mapping (approximate), explainable risk-prioritization scoring (NOT CVSS), and knowledge-based forecasting using documented ATT&amp;CK post-exploitation relationships. No custom ML model is used at any stage of the pipeline.</p>
+      <p><strong>Score ceiling:</strong> MAX_SCORE = 28 (T1595=2 + T1110=5 + T1098=7 + T1048=8 + T1498=6). Each technique counted once per group.</p>
+      <p><strong>Forecast disclaimer:</strong> Forecasts are knowledge-based associations from documented ATT&amp;CK relationships — not ML predictions, not probability scores, and not guarantees of future attacker behaviour.</p>
+      <p><strong>Language disclaimer:</strong> Reports use cautious language ("indicates suspicious activity", "consistent with a possible multi-stage attack", "requires investigation"). No usernames, machines, credentials, or business impact are invented beyond what is present in the source dataset.</p>
+      <div class="made">Made with IBM Bob</div>
+    </div>
+  </section>
+
+</div><!-- /content-inner -->
+</div><!-- /main-content -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DATA — all values sourced from the correlate_alerts.py pipeline
+// and verified against final_report.txt
+// ═══════════════════════════════════════════════════════════════════
+
+// Scoring table — mirrors TECHNIQUE_SCORES in correlate_alerts.py
+const TECHNIQUE_SCORES = {
+  T1595: { pts: 2, tactic: "Reconnaissance",      name: "Active Scanning" },
+  T1110: { pts: 5, tactic: "Credential Access",   name: "Brute Force" },
+  T1098: { pts: 7, tactic: "Persistence/PrivEsc", name: "Account Manipulation" },
+  T1048: { pts: 8, tactic: "Exfiltration",        name: "Exfiltration Over Alternative Protocol" },
+  T1498: { pts: 6, tactic: "Impact",              name: "Network Denial of Service" },
+};
+const MAX_SCORE = Object.values(TECHNIQUE_SCORES).reduce((s,v)=>s+v.pts,0); // 28
+
+// Validate — throws if any report score exceeds MAX_SCORE
+function validateScore(score, ip) {
+  if (score > MAX_SCORE) throw new Error(`Score ${score} for ${ip} exceeds MAX_SCORE ${MAX_SCORE}`);
+}
+
+// ── Forecast knowledge-base objects — mirror FORECAST_KB entries ────────
+
+// FORECAST_KB["T1048"]
+const FORECAST_T1048 = {
+  observed: "T1048 - Exfiltration Over Alternative Protocol",
+  why: "Exfiltration is typically a late-stage technique. Post-exfiltration activity "
+     + "documented in ATT&CK includes defense evasion (removing evidence) and lateral "
+     + "movement to expand the breach to adjacent systems.",
+  next: [
+    {
+      wording: "A plausible next step is defense evasion activity. Monitor for log clearing, "
+             + "file deletion in staging areas, or changes to audit policies.",
+      technique: "T1070 - Indicator Removal",
+      ref: "MITRE ATT&CK T1070 — https://attack.mitre.org/techniques/T1070/",
+    },
+    {
+      wording: "Commonly associated follow-on activity includes lateral movement. Monitor for "
+             + "unusual remote service connections (RDP, SSH, SMB) from this host to adjacent systems.",
+      technique: "T1021 - Remote Services",
+      ref: "MITRE ATT&CK T1021 — https://attack.mitre.org/techniques/T1021/",
+    },
+  ],
+};
+
+// FORECAST_KB["T1498"]
+const FORECAST_T1498 = {
+  observed: "T1498 - Network Denial of Service",
+  why: "DDoS is an Impact technique. ATT&CK and threat intelligence report that volumetric "
+     + "attacks are sometimes used as a distraction to mask concurrent intrusion activity on "
+     + "other systems or services.",
+  next: [
+    {
+      wording: "Commonly associated with concurrent defense evasion activity. Monitor for log "
+             + "clearing or unusual access patterns on other systems during or immediately after "
+             + "the traffic flood.",
+      technique: "T1070 - Indicator Removal",
+      ref: "MITRE ATT&CK T1070 — https://attack.mitre.org/techniques/T1070/",
+    },
+    {
+      wording: "A plausible associated activity is concurrent reconnaissance or intrusion on other "
+             + "systems while this flood is active. Review traffic to other hosts during this time window.",
+      technique: "T1595 - Active Scanning (concurrent or follow-on)",
+      ref: "MITRE ATT&CK T1498 procedure examples — https://attack.mitre.org/techniques/T1498/",
+    },
+  ],
+};
+
+// FORECAST_KB["T1078"]
+const FORECAST_T1078 = {
+  observed: "T1078 - Valid Accounts",
+  why: "Use of valid accounts is documented across multiple ATT&CK tactics (Initial Access, "
+     + "Persistence, Privilege Escalation, Defense Evasion). Once an adversary holds working "
+     + "credentials, ATT&CK documents common follow-on steps as lateral movement to additional "
+     + "systems and data collection ahead of exfiltration.",
+  next: [
+    {
+      wording: "A plausible next step is lateral movement using the obtained credentials. Monitor "
+             + "for this account authenticating to other systems via remote services such as RDP, "
+             + "SSH, or SMB.",
+      technique: "T1021 - Remote Services",
+      ref: "MITRE ATT&CK T1021 — https://attack.mitre.org/techniques/T1021/",
+    },
+    {
+      wording: "Commonly associated follow-on activity includes account manipulation. Monitor for "
+             + "unexpected changes to roles, group membership, or password policies associated with "
+             + "this account.",
+      technique: "T1098 - Account Manipulation",
+      ref: "MITRE ATT&CK T1098 — https://attack.mitre.org/techniques/T1098/",
+    },
+  ],
+};
+
+// ── Step sets — one per chain type ─────────────────────────────────────
+
+const STEPS_4CHAIN = [
+  { code:"T1595", reason:"Active reconnaissance / port scanning detected against this host" },
+  { code:"T1110", reason:"Repeated failed login attempts (brute force) observed from this IP" },
+  { code:"T1098", reason:"Account settings manipulated to maintain or elevate access on this system" },
+  { code:"T1048", reason:"Data transferred out over a non-standard or alternative protocol" },
+];
+
+const STEPS_BRUTE_DDOS = [
+  { code:"T1110", reason:"Repeated failed login attempts (brute force) observed from this IP" },
+  { code:"T1498", reason:"High-volume traffic spike consistent with a denial-of-service attack" },
+];
+
+// ── All 5 attack chains ─────────────────────────────────────────────────
+// Each chain carries its own steps, forecast, bottomLine, actions, and badge.
+const CHAINS = [
+  {
+    ip:"192.168.10.45", score:22, duration:"6m 54s", alertCount:4,
+    times:["02:14:00","02:15:58","02:17:56","02:19:54"],
+    steps: STEPS_4CHAIN,
+    badge: "HIGH", badgeClass: "badge-high",
+    bottomLine:
+      "Alert data from this IP indicates suspicious activity consistent with a possible "
+    + "multi-stage attack sequence: reconnaissance, credential access attempts, account "
+    + "manipulation, and outbound data transfer were all observed. "
+    + "This requires immediate investigation and containment.",
+    forecast: FORECAST_T1048,
+    actions: [
+      "Block this source IP at the perimeter firewall pending investigation.",
+      "Review outbound network transfers from this host during the observed time window "
+    + "and assess whether sensitive data may have been involved.",
+      "Audit authentication and account-change logs for the period covered by this alert group.",
+    ],
+  },
+  {
+    ip:"10.0.3.212", score:22, duration:"6m 19s", alertCount:4,
+    times:["07:51:00","07:53:06","07:55:12","07:57:18"],
+    steps: STEPS_4CHAIN,
+    badge: "HIGH", badgeClass: "badge-high",
+    bottomLine:
+      "Alert data from this IP indicates suspicious activity consistent with a possible "
+    + "multi-stage attack sequence: reconnaissance, credential access attempts, account "
+    + "manipulation, and outbound data transfer were all observed. "
+    + "This requires immediate investigation and containment.",
+    forecast: FORECAST_T1048,
+    actions: [
+      "Block this source IP at the perimeter firewall pending investigation.",
+      "Review outbound network transfers from this host during the observed time window "
+    + "and assess whether sensitive data may have been involved.",
+      "Audit authentication and account-change logs for the period covered by this alert group.",
+    ],
+  },
+  {
+    ip:"172.16.88.7", score:22, duration:"10m 45s", alertCount:4,
+    times:["13:37:00","13:40:15","13:43:30","13:46:45"],
+    steps: STEPS_4CHAIN,
+    badge: "HIGH", badgeClass: "badge-high",
+    bottomLine:
+      "Alert data from this IP indicates suspicious activity consistent with a possible "
+    + "multi-stage attack sequence: reconnaissance, credential access attempts, account "
+    + "manipulation, and outbound data transfer were all observed. "
+    + "This requires immediate investigation and containment.",
+    forecast: FORECAST_T1048,
+    actions: [
+      "Block this source IP at the perimeter firewall pending investigation.",
+      "Review outbound network transfers from this host during the observed time window "
+    + "and assess whether sensitive data may have been involved.",
+      "Audit authentication and account-change logs for the period covered by this alert group.",
+    ],
+  },
+  {
+    ip:"185.220.101.33", score:22, duration:"8m 8s", alertCount:4,
+    times:["20:05:00","20:07:43","20:10:26","20:13:09"],
+    steps: STEPS_4CHAIN,
+    badge: "HIGH", badgeClass: "badge-high",
+    bottomLine:
+      "Alert data from this IP indicates suspicious activity consistent with a possible "
+    + "multi-stage attack sequence: reconnaissance, credential access attempts, account "
+    + "manipulation, and outbound data transfer were all observed. "
+    + "This requires immediate investigation and containment.",
+    forecast: FORECAST_T1048,
+    actions: [
+      "Block this source IP at the perimeter firewall pending investigation.",
+      "Review outbound network transfers from this host during the observed time window "
+    + "and assess whether sensitive data may have been involved.",
+      "Audit authentication and account-change logs for the period covered by this alert group.",
+    ],
+  },
+  {
+    ip:"198.51.100.77", score:11, duration:"5m 55s", alertCount:3,
+    times:["10:31:14","10:34:43","10:37:09"],
+    steps: STEPS_BRUTE_DDOS,
+    badge: "MEDIUM", badgeClass: "badge-medium",
+    bottomLine:
+      "Repeated credential access attempts were observed from this IP, followed by "
+    + "high-volume traffic consistent with a denial-of-service attempt. "
+    + "This pattern may indicate a distraction-and-intrusion combination — "
+    + "review concurrent activity on other hosts during the flood window.",
+    forecast: FORECAST_T1498,
+    actions: [
+      "Activate or verify DDoS mitigation controls for this source IP.",
+      "Review authentication logs on targeted services during the time window "
+    + "to determine whether the brute-force component succeeded.",
+      "Inspect logs of other hosts during the flood window for signs of "
+    + "concurrent intrusion or lateral movement activity.",
+    ],
+  },
+];
+
+// Validate all scores on load
+CHAINS.forEach(c => validateScore(c.score, c.ip));
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER HELPERS
+// ═══════════════════════════════════════════════════════════════════
+const pct = score => Math.round(score / MAX_SCORE * 100);
+
+// ── Render: technique chain with tactic label above each chip ───────────
+function techChainHTML(steps, times, date) {
+  return `<div class="chain-step-wrap">${steps.map((s, i) => {
+    const info = TECHNIQUE_SCORES[s.code] || { name: s.code, tactic: '' };
+    const ts   = (times && times[i]) ? `${date || ''} ${times[i]}` : '';
+    return (i > 0 ? '<span class="chain-step-arrow">›</span>' : '')
+      + `<div class="chain-step-box">
+           <div class="chain-step-tactic">${info.tactic}</div>
+           <div class="tech-box">
+             <div class="tc">${s.code}</div>
+             <div class="tn">${info.name}</div>
+             ${ts ? `<div class="tt">${ts}</div>` : ''}
+           </div>
+         </div>`;
+  }).join('')}</div>`;
+}
+
+// ── Render: forecast ─────────────────────────────────────────────────────
+function forecastHTML(fc) {
+  if (!fc || !fc.next || !fc.next.length)
+    return '<p style="font-size:11px;color:var(--text-dim)">No forecast associations for these techniques.</p>';
+  const items = fc.next.map(n =>
+    `<div class="forecast-item">
+       <div class="forecast-item-technique">${n.technique}</div>
+       <div class="forecast-item-text">${n.wording}</div>
+       <div class="forecast-src">Ref: ${n.ref}</div>
+     </div>`
+  ).join('');
+  return `<div class="forecast-not-ml">Knowledge-based associations · not ML · not a probability</div>
+    <div class="forecast-why">${fc.why}</div>
+    ${items}`;
+}
+
+// ── Render: action list ──────────────────────────────────────────────────
+function actionsHTML(actions) {
+  if (!actions || !actions.length)
+    return '<p style="font-size:11px;color:var(--text-dim)">No actions defined.</p>';
+  return `<ul class="action-list">${actions.map((a, i) =>
+    `<li><span class="action-num">${i+1}</span><span>${a}</span></li>`
+  ).join('')}</ul>`;
+}
+
+// ── Render: full detail card using 5-step narrative flow ─────────────────
+function fullCardHTML(opts) {
+  // opts: { ip, badge, badgeClass, score, duration, alertCount,
+  //         steps, times, date, bottomLine, forecast, actions, corrEl }
+  const { ip, badge, badgeClass, score, duration, alertCount,
+          steps, times, date, bottomLine, forecast, actions, corrEl } = opts;
+  const riskClass = badge === 'HIGH' ? 'risk-high' : badge === 'MEDIUM' ? 'risk-medium' : 'risk-low';
+
+  // Score breakdown rows (only techniques we know the score for)
+  const scorable = steps.filter(s => TECHNIQUE_SCORES[s.code]);
+  const scoreRows = scorable.map(s => {
+    const info = TECHNIQUE_SCORES[s.code];
+    return `<tr>
+      <td class="code">${s.code}</td>
+      <td class="pts">+${info.pts}</td>
+      <td class="desc">${s.reason || info.name} <span style="color:var(--text-dim)">(${info.tactic})</span></td>
+    </tr>`;
+  }).join('');
+  const scoreTable = scorable.length
+    ? `<table class="score-table">
+         ${scoreRows}
+         <tr class="total-row">
+           <td colspan="2" class="pts">${score}/${MAX_SCORE}</td>
+           <td class="desc" style="color:var(--text);font-weight:700">Total — NOT CVSS</td>
+         </tr>
+       </table>`
+    : `<p style="font-size:11px;color:var(--text-muted)">Score: ${score}/${MAX_SCORE} (techniques from uploaded CSV).</p>`;
+
+  return `
+  <div class="full-card ${riskClass}">
+    <div class="full-card-header">
+      <span class="ip">${ip}</span>
+      <span class="badge ${badgeClass}">${badge}</span>
+      <span class="score-chip">${score}/${MAX_SCORE}</span>
+    </div>
+    <div class="full-card-body">
+
+      <!-- 1 · What happened -->
+      <div class="flow-section">
+        <div class="flow-section-header">
+          <span class="flow-step-num">1</span>
+          <span class="flow-step-title">What Happened</span>
+          <span class="flow-step-meta">${alertCount} alert${alertCount !== 1 ? 's' : ''} · ${duration}</span>
+        </div>
+        <div class="bottom-line-box">${bottomLine}</div>
+      </div>
+
+      <!-- 2 · Techniques detected -->
+      <div class="flow-section">
+        <div class="flow-section-header">
+          <span class="flow-step-num">2</span>
+          <span class="flow-step-title">Techniques Detected</span>
+          <span class="flow-step-meta">MITRE ATT&amp;CK · ${steps.length} technique${steps.length !== 1 ? 's' : ''} in sequence</span>
+        </div>
+        ${techChainHTML(steps, times, date)}
+      </div>
+
+      <!-- 3 · Why this risk level -->
+      <div class="flow-section">
+        <div class="flow-section-header">
+          <span class="flow-step-num">3</span>
+          <span class="flow-step-title">Why This Risk Level</span>
+          <span class="flow-step-meta">Explainable scoring · NOT CVSS</span>
+        </div>
+        <div class="score-evidence-row">
+          <div>
+            <div class="score-bar-block">
+              <div class="score-bar-inline-label">
+                <span>Risk Score</span><strong>${score}/${MAX_SCORE}</strong>
+              </div>
+              <div class="score-track"><div class="score-fill" style="width:${pct(score)}%"></div></div>
+            </div>
+            ${scoreTable}
+          </div>
+          <div>${corrEl}</div>
+        </div>
+      </div>
+
+      <!-- 4 · What could happen next -->
+      <div class="flow-section">
+        <div class="flow-section-header">
+          <span class="flow-step-num">4</span>
+          <span class="flow-step-title">What Could Happen Next</span>
+          <span class="flow-step-meta">ATT&amp;CK-based · not ML · not guaranteed</span>
+        </div>
+        ${forecastHTML(forecast)}
+      </div>
+
+      <!-- 5 · Recommended actions -->
+      <div class="flow-section">
+        <div class="flow-section-header">
+          <span class="flow-step-num">5</span>
+          <span class="flow-step-title">Recommended Actions</span>
+          <span class="flow-step-meta">Prioritised by severity</span>
+        </div>
+        ${actionsHTML(actions)}
+      </div>
+
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DEMO DATASET RENDER — renders CHAINS into the analysis sections
+// Called only when the user explicitly requests the demo.
+// ═══════════════════════════════════════════════════════════════════
+function renderDemo() {
+  // Summary tiles — mirror the known totals for the bundled dataset
+  document.getElementById('stat-raw').textContent    = 203;
+  document.getElementById('stat-clean').textContent  = 203;
+  document.getElementById('stat-groups').textContent = 184;
+  document.getElementById('stat-chains').textContent = CHAINS.length;
+  const riskEl = document.getElementById('stat-risk');
+  const highN = CHAINS.filter(c => c.badge === 'HIGH').length;
+  const medN  = CHAINS.filter(c => c.badge === 'MEDIUM').length;
+  riskEl.innerHTML = `<span class="num-red">${highN}</span> High`
+    + (medN ? ` · <span class="num-ora">${medN}</span> Med` : '');
+  document.getElementById('stat-ips').textContent = new Set(CHAINS.map(c => c.ip)).size;
+
+  // Filename tag
+  const fileTagEl = document.getElementById('summary-file-tag');
+  if (fileTagEl) { fileTagEl.textContent = 'alerts.csv (demo)'; fileTagEl.style.display = 'inline'; }
+
+  // Before/After panel
+  document.getElementById('ba-raw').textContent    = 203;
+  document.getElementById('ba-groups').textContent = 184;
+  document.getElementById('ba-chains').textContent = CHAINS.length;
+  const alertsInDemo = CHAINS.reduce((s, c) => s + c.alertCount, 0);
+  document.getElementById('ba-summary').innerHTML =
+    `<strong>${alertsInDemo} alerts</strong> were merged into `
+    + `<strong>${CHAINS.length} multi-stage attack chains</strong>. `
+    + `Correlation reduces 203 raw alerts to 184 correlated groups, `
+    + `of which <strong>${CHAINS.length} are multi-stage</strong> and 12 are standalone suspicious.`;
+
+  // Data Quality panel
+  document.getElementById('dq-raw').textContent        = 203;
+  document.getElementById('dq-dupes').textContent      = 0;
+  document.getElementById('dq-skipped').textContent    = 0;
+  document.getElementById('dq-clean').textContent      = 203;
+  document.getElementById('dq-groups').textContent     = 184;
+  document.getElementById('dq-benign').textContent     = 167;
+  document.getElementById('dq-suspicious').textContent = 12;
+  document.getElementById('dq-multistage').textContent = CHAINS.length;
+
+  // Chain overview cards
+  const overviewEl = document.getElementById('chain-overview');
+  overviewEl.innerHTML = CHAINS.map(c => {
+    const scoreColor = c.badge === 'HIGH' ? 'num-red' : c.badge === 'MEDIUM' ? 'num-ora' : 'num-grn';
+    const riskClass  = c.badge === 'HIGH' ? 'risk-high' : c.badge === 'MEDIUM' ? 'risk-medium' : 'risk-low';
+    return `
+    <div class="chain-card ${riskClass}">
+      <div class="chain-card-top">
+        <span class="chain-ip">${c.ip}</span>
+        <span class="badge ${c.badgeClass}">${c.badge}</span>
+      </div>
+      <div class="chain-meta">
+        <div class="chain-meta-item"><div class="mv ${scoreColor}">${c.score}/${MAX_SCORE}</div><div class="mk">Score</div></div>
+        <div class="chain-meta-item"><div class="mv">${c.duration}</div><div class="mk">Duration</div></div>
+        <div class="chain-meta-item"><div class="mv">${c.alertCount}</div><div class="mk">Alerts</div></div>
+        <div class="chain-meta-item"><div class="mv">${c.steps.length}</div><div class="mk">Techniques</div></div>
+      </div>
+      <div class="score-bar-row">
+        <div class="score-label"><span>Risk Score</span><span>${c.score}/${MAX_SCORE}</span></div>
+        <div class="score-track"><div class="score-fill" style="width:${pct(c.score)}%"></div></div>
+      </div>
+      <div class="tech-chain">${techChainHTML(c.steps, c.times, '2024-06-15')}</div>
+    </div>`;
+  }).join('');
+
+  // Full detail cards
+  const detailEl = document.getElementById('chain-detail');
+  detailEl.innerHTML = CHAINS.map(c => {
+    const corrEl = `<ul class="corr-ev">
+      <li><span class="ck">Source IP</span><span class="cv">${c.ip}</span></li>
+      <li><span class="ck">Alerts in group</span><span class="cv">${c.alertCount}</span></li>
+      <li><span class="ck">Duration</span><span class="cv">${c.duration}</span></li>
+      <li><span class="ck">First → Last</span><span class="cv">2024-06-15 ${c.times[0]} → 2024-06-15 ${c.times[c.times.length-1]}</span></li>
+      <li><span class="ck">Distinct techniques</span><span class="cv">${c.steps.length} (${c.steps.map(s=>s.code).join(', ')})</span></li>
+      <li><span class="ck">Correlation rule</span><span class="cv">same source_ip + gap ≤ 10 min</span></li>
+    </ul>`;
+    return fullCardHTML({
+      ip: c.ip, badge: c.badge, badgeClass: c.badgeClass, score: c.score,
+      duration: c.duration, alertCount: c.alertCount,
+      steps: c.steps, times: c.times, date: '2024-06-15',
+      bottomLine: c.bottomLine, forecast: c.forecast,
+      actions: c.actions, corrEl,
+    });
+  }).join('');
+
+  showAnalysisSections();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAGE STATE — show/hide analysis sections based on data availability
+// ═══════════════════════════════════════════════════════════════════
+const ANALYSIS_SECTION_IDS = ['sec-mitre', 'sec-chains'];
+
+function showEmptyState() {
+  ANALYSIS_SECTION_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  let banner = document.getElementById('no-data-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'no-data-banner';
+    banner.className = 'no-data-banner';
+    banner.innerHTML = `
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round"/>
+      </svg>
+      <p><strong>No dataset loaded.</strong><br>Upload an Alerts CSV to begin analysis.<br>
+      Required columns: <code style="font-family:monospace;color:var(--accent)">source_ip, timestamp, alert_type</code></p>
+      <button class="demo-btn" id="load-demo-btn">Load bundled demo dataset (alerts.csv)</button>`;
+    // Insert before the first analysis section
+    const anchor = document.getElementById('sec-mitre');
+    if (anchor) anchor.parentNode.insertBefore(banner, anchor);
+    document.getElementById('load-demo-btn').addEventListener('click', function() {
+      banner.style.display = 'none';
+      renderDemo();
+    });
+  } else {
+    banner.style.display = 'flex';
+  }
+}
+
+function showAnalysisSections() {
+  const banner = document.getElementById('no-data-banner');
+  if (banner) banner.style.display = 'none';
+  ANALYSIS_SECTION_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = '';
+  });
+}
+
+// Show empty state on initial load (no data yet)
+showEmptyState();
+/* ── Correlation logic ───────────────────────────────────────── */
+/**
+ * correlateAlerts(rows)
+ *
+ * Replicates the Python correlation pipeline:
+ *   1. Remove exact-duplicate rows (same source_ip + timestamp + alert_type).
+ *   2. Skip rows whose timestamp is missing/empty — counted in skippedCount.
+ *   3. Sort the clean rows by timestamp (ISO / epoch strings sort lexically;
+ *      numeric ms values are compared numerically).
+ *   4. Group by source_ip: consecutive alerts from the same IP whose
+ *      timestamps are within 10 minutes of the previous alert in the group
+ *      belong to the same group.
+ *
+ * Returns: { groups, duplicatesRemoved, skippedCount }
+ *   groups — array of:
+ *     { source_ip, alert_types, start_time, end_time, alert_count }
+ */
+function correlateAlerts(rows) {
+  const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+  // ── Step 1: deduplicate ─────────────────────────────────────────
+  const seen = new Set();
+  const deduped = [];
+  for (const row of rows) {
+    const key = `${row.source_ip}|${row.timestamp}|${row.alert_type}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(row);
+    }
+  }
+  const duplicatesRemoved = rows.length - deduped.length;
+
+  // ── Step 2: filter out missing/empty timestamps ─────────────────
+  let skippedCount = 0;
+  const valid = [];
+  for (const row of deduped) {
+    if (!row.timestamp || row.timestamp.trim() === '') {
+      skippedCount++;
+    } else {
+      valid.push(row);
+    }
+  }
+
+  // ── Step 3: sort by timestamp ───────────────────────────────────
+  // Works for ISO-8601 strings, space-separated datetime strings, and
+  // numeric (epoch ms) strings because Date.parse() handles all three.
+  valid.sort((a, b) => {
+    const ta = Date.parse(a.timestamp);
+    const tb = Date.parse(b.timestamp);
+    // Fall back to lexicographic if either value is unparseable
+    if (isNaN(ta) || isNaN(tb)) return a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0;
+    return ta - tb;
+  });
+
+  // ── Step 4: group by source_ip within 10-minute window ──────────
+  // Keep one open group per IP; close it when the gap exceeds the window.
+  const openGroups = new Map(); // source_ip → current group object
+  const groups = [];
+
+  for (const row of valid) {
+    const ts = Date.parse(row.timestamp);
+    const ip = row.source_ip;
+
+    if (openGroups.has(ip)) {
+      const grp = openGroups.get(ip);
+      const lastTs = Date.parse(grp.end_time);
+      if (!isNaN(ts) && !isNaN(lastTs) && ts - lastTs <= WINDOW_MS) {
+        // Extend the current group
+        grp.alert_types.push(row.alert_type);
+        grp.end_time = row.timestamp;
+        grp.alert_count++;
+      } else {
+        // Gap too large — close old group, start a new one
+        groups.push(grp);
+        const newGrp = {
+          source_ip:   ip,
+          alert_types: [row.alert_type],
+          start_time:  row.timestamp,
+          end_time:    row.timestamp,
+          alert_count: 1,
+        };
+        openGroups.set(ip, newGrp);
+      }
+    } else {
+      // First alert seen for this IP
+      const newGrp = {
+        source_ip:   ip,
+        alert_types: [row.alert_type],
+        start_time:  row.timestamp,
+        end_time:    row.timestamp,
+        alert_count: 1,
+      };
+      openGroups.set(ip, newGrp);
+    }
+  }
+
+  // Flush remaining open groups
+  for (const grp of openGroups.values()) {
+    groups.push(grp);
+  }
+
+  return { groups, duplicatesRemoved, skippedCount };
+}
+
+/* ── MITRE ATT&CK tagging ────────────────────────────────────── */
+/**
+ * tagWithMitre(groups)
+ *
+ * Accepts the groups array produced by correlateAlerts() and, for every
+ * alert_type in each group's alert_types sequence, appends the matching
+ * MITRE ATT&CK technique (or "Unmapped" for unknown types).
+ *
+ * Mutates each group in-place and also returns the same array, so callers
+ * can chain: const groups = tagWithMitre(correlateAlerts(rows).groups)
+ *
+ * Adds to each group:
+ *   mitre_tags  — parallel array to alert_types; one tag per alert
+ */
+const MITRE_MAP = {
+  'PortScan':             'T1595 - Active Scanning',
+  'Brute Force':          'T1110 - Brute Force',
+  'Privilege Escalation': 'T1098 - Account Manipulation',
+  // Matches Python: T1048 (Exfiltration Over Alternative Protocol), NOT T1005
+  'Data Exfiltration':    'T1048 - Exfiltration Over Alternative Protocol',
+  'DDoS':                 'T1498 - Network Denial of Service',
+  'BENIGN':               'No MITRE tag (normal traffic)',
+};
+
+function tagWithMitre(groups) {
+  for (const grp of groups) {
+    grp.mitre_tags = grp.alert_types.map(
+      type => MITRE_MAP[type] ?? 'Unmapped'
+    );
+  }
+  return groups;
+}
+
+/* ── Risk scoring & forecast ─────────────────────────────────── */
+/**
+ * scoreAndForecast(groups)
+ *
+ * Operates on the groups array after tagWithMitre() has run.
+ * For each group:
+ *   1. Sums risk points from each alert's MITRE tag.
+ *   2. Classifies risk level: LOW 0-5 | MEDIUM 6-15 | HIGH 16+
+ *   3. Builds plain-English why_this_score reasons per technique present.
+ *   4. Adds a knowledge-based forecast for high-signal techniques.
+ *
+ * Mutates each group in-place and returns the array.
+ * Adds: risk_score, risk_level, why_this_score (array), forecast (array)
+ */
+const SCORE_MAP = {
+  'T1595 - Active Scanning':                        { pts: 2, reason: 'Active Scanning (T1595) suggests reconnaissance activity — the attacker is probing for open ports or services (+2).' },
+  'T1110 - Brute Force':                            { pts: 5, reason: 'Brute Force (T1110) indicates repeated credential-guessing attempts, a significant threat to account security (+5).' },
+  'T1098 - Account Manipulation':                   { pts: 7, reason: 'Account Manipulation (T1098) indicates privilege escalation or persistent access — a high-severity action (+7).' },
+  'T1048 - Exfiltration Over Alternative Protocol': { pts: 8, reason: 'Exfiltration Over Alternative Protocol (T1048) signals active data exfiltration — the highest-severity indicator present (+8).' },
+  'T1498 - Network Denial of Service':              { pts: 6, reason: 'Network Denial of Service (T1498) disrupts availability and is commonly used as a smokescreen for other activity (+6).' },
+  'No MITRE tag (normal traffic)':                  { pts: 0, reason: null },
+  'Unmapped':                                       { pts: 0, reason: null },
+};
+
+const FORECAST_MAP = {
+  'T1048 - Exfiltration Over Alternative Protocol': [
+    'Exfiltration activity (T1048) is commonly associated with prior Defense Evasion techniques designed to remove evidence of the breach (T1070 - Indicator Removal).',
+    'Post-exfiltration activity is commonly associated with Lateral Movement to adjacent systems to expand the breach (T1021 - Remote Services).',
+  ],
+  'T1098 - Account Manipulation': [
+    'Account Manipulation (T1098) is commonly associated with attempts to broaden data access using the newly elevated privileges.',
+    'Privilege escalation events are commonly associated with subsequent Defense Evasion actions to hide the attacker\'s presence (T1070 - Indicator Removal).',
+  ],
+  'T1498 - Network Denial of Service': [
+    'Denial-of-Service activity (T1498) is sometimes used as a distraction to divert analyst attention while other intrusion activity proceeds undetected.',
+    'Concurrent reconnaissance on other hosts during the flood window is a documented threat pattern (T1595 - Active Scanning).',
+  ],
+};
+
+function scoreAndForecast(groups) {
+  for (const grp of groups) {
+    // ── 1. Score ──────────────────────────────────────────────────
+    // Mirrors Python exactly: each unique tag is counted AT MOST ONCE.
+    // Repeated occurrences of the same tag (e.g. two Brute Force alerts)
+    // add points only on first occurrence — prevents score inflation.
+    let total = 0;
+    const scoredTags    = new Set(); // dedup points — matches Python's `counted` set
+    const reasonsSeen   = new Set(); // dedup reason text
+    const forecastsSeen = new Set();
+    const why = [];
+    const forecast = [];
+
+    for (const tag of grp.mitre_tags) {
+      const entry = SCORE_MAP[tag];
+      if (!entry) continue;
+
+      // Add points only once per unique tag (mirrors Python deduplication)
+      if (!scoredTags.has(tag)) {
+        total += entry.pts;
+        scoredTags.add(tag);
+      }
+      if (entry.reason && !reasonsSeen.has(tag)) {
+        why.push(entry.reason);
+        reasonsSeen.add(tag);
+      }
+      // ── 3. Forecast ─────────────────────────────────────────────
+      if (FORECAST_MAP[tag] && !forecastsSeen.has(tag)) {
+        for (const line of FORECAST_MAP[tag]) forecast.push(line);
+        forecastsSeen.add(tag);
+      }
+    }
+
+    // ── 2. Classify — thresholds match Python RISK_LEVELS ─────────
+    const level = total >= 16 ? 'HIGH' : total >= 6 ? 'MEDIUM' : 'LOW';
+
+    grp.risk_score     = total;
+    grp.risk_level     = level;
+    grp.why_this_score = why;
+    grp.forecast       = forecast;
+  }
+  return groups;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// renderDashboard(groups, meta)
+//
+// Drives every visual section using the groups produced by the
+// correlate → tag → score pipeline.  meta = { rawCount, duplicatesRemoved,
+// skippedCount, filename }.
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Helpers to bridge the new group shape to the existing render fns ──
+
+/**
+ * Extract the MITRE technique code (e.g. "T1595") from a full tag string
+ * like "T1595 - Active Scanning".  Returns null for benign/unmapped tags.
+ */
+function codeFromTag(tag) {
+  const m = tag.match(/^(T\d{4})/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Build the `steps` array expected by techChainHTML / scoreTableHTML /
+ * whyScoreHTML from a group's deduplicated mitre_tags and why_this_score.
+ * Steps are deduplicated (first occurrence of each technique code wins).
+ */
+function stepsFromGroup(grp) {
+  const seen = new Set();
+  const steps = [];
+  grp.mitre_tags.forEach((tag, i) => {
+    const code = codeFromTag(tag);
+    if (!code || seen.has(code)) return;
+    seen.add(code);
+    // Use the matching why_this_score sentence as the step reason (if present)
+    const reason = grp.why_this_score.find(r => r.includes(`(${code})`))
+      || `${tag} detected`;
+    steps.push({ code, reason });
+  });
+  return steps;
+}
+
+/**
+ * Compute a human-readable duration string between two timestamp strings.
+ */
+function durationStr(start, end) {
+  const ms = Date.parse(end) - Date.parse(start);
+  if (isNaN(ms) || ms < 0) return '—';
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+/**
+ * Convert a group's forecast array (plain strings) to the richly-structured
+ * object expected by forecastHTML().  Reuses the last observed tag as the
+ * "observed" field.
+ */
+function forecastObjFromGroup(grp) {
+  // Find the highest-scoring tag to use as the "observed last" header
+  let topTag = 'Unknown technique';
+  let topPts = -1;
+  for (const tag of grp.mitre_tags) {
+    const entry = SCORE_MAP[tag];
+    if (entry && entry.pts > topPts) { topPts = entry.pts; topTag = tag; }
+  }
+  return {
+    observed: topTag,
+    why: 'Knowledge-based associations from documented ATT\u0026CK post-exploitation relationships.',
+    next: grp.forecast.map(line => ({
+      wording:   line,
+      technique: '',
+      ref:       'MITRE ATT\u0026CK — https://attack.mitre.org/',
+    })),
+  };
+}
+
+/**
+ * Generate context-appropriate recommended actions for a group based on
+ * the highest-severity technique found and the overall risk level.
+ */
+function actionsFromGroup(grp) {
+  const tags = new Set(grp.mitre_tags);
+  const actions = [];
+
+  if (tags.has('T1048 - Exfiltration Over Alternative Protocol') || tags.has('T1098 - Account Manipulation')) {
+    actions.push(`Block source IP ${grp.source_ip} at the perimeter firewall pending investigation.`);
+    actions.push(`Review outbound network transfers from this host during ${grp.start_time} – ${grp.end_time} and assess whether sensitive data may have been involved.`);
+    actions.push('Audit authentication and account-change logs for the time window covered by this alert group.');
+  } else if (tags.has('T1498 - Network Denial of Service')) {
+    actions.push(`Activate or verify DDoS mitigation controls for source IP ${grp.source_ip}.`);
+    actions.push('Review authentication logs on targeted services during the time window to determine whether a concurrent intrusion component succeeded.');
+    actions.push('Inspect logs of other hosts during the flood window for signs of concurrent lateral movement activity.');
+  } else if (tags.has('T1110 - Brute Force')) {
+    actions.push(`Temporarily block or rate-limit source IP ${grp.source_ip} on authentication endpoints.`);
+    actions.push('Check whether any login attempt during this window succeeded and, if so, reset the affected credentials immediately.');
+  } else if (tags.has('T1595 - Active Scanning')) {
+    actions.push(`Investigate source IP ${grp.source_ip} — active reconnaissance detected against your network.`);
+    actions.push('Review firewall rules to ensure non-essential ports are not reachable from this IP range.');
+  } else {
+    actions.push(`Review alert group from ${grp.source_ip} — ${grp.alert_count} alert(s) between ${grp.start_time} and ${grp.end_time}.`);
+  }
+  return actions;
+}
+
+/**
+ * Produce a plain-English "Bottom Line" sentence for a group.
+ */
+function bottomLineFromGroup(grp) {
+  if (grp.risk_level === 'HIGH') {
+    return `Alert data from ${grp.source_ip} indicates suspicious activity consistent with a possible `
+      + `multi-stage attack: ${[...new Set(grp.alert_types)].join(', ')} were all observed between `
+      + `${grp.start_time} and ${grp.end_time}. This requires immediate investigation and containment.`;
+  }
+  if (grp.risk_level === 'MEDIUM') {
+    return `Activity from ${grp.source_ip} shows ${grp.alert_count} alert(s) `
+      + `(${[...new Set(grp.alert_types)].join(', ')}) over the observed window. `
+      + `This pattern warrants investigation — review concurrent activity on other hosts.`;
+  }
+  return `Low-risk activity from ${grp.source_ip}: ${grp.alert_count} alert(s) detected. `
+    + `No high-severity techniques identified — monitor for escalation.`;
+}
+
+// ── Correlation evidence for a dynamic group ─────────────────────────
+function corrEvidenceFromGroup(grp, steps) {
+  return `<ul class="corr-ev">
+    <li><span class="ck">Source IP</span><span class="cv">${grp.source_ip}</span></li>
+    <li><span class="ck">Alerts in group</span><span class="cv">${grp.alert_count}</span></li>
+    <li><span class="ck">Duration</span><span class="cv">${durationStr(grp.start_time, grp.end_time)}</span></li>
+    <li><span class="ck">Time span</span><span class="cv">${grp.start_time} — ${grp.end_time}</span></li>
+    <li><span class="ck">Distinct techniques</span><span class="cv">${steps.length} (${steps.map(s=>s.code).join(', ') || '—'})</span></li>
+    <li><span class="ck">Correlation rule</span><span class="cv">same source_ip + gap ≤ 10 min</span></li>
+  </ul>`;
+}
+
+// ── techChainFromGroup: build step timestamps then delegate to techChainHTML
+function techChainFromGroup(grp, steps) {
+  const stepTimes = steps.map((s, idx) => {
+    for (let i = 0; i < grp.mitre_tags.length; i++) {
+      if (codeFromTag(grp.mitre_tags[i]) === s.code) {
+        return idx === 0 ? grp.start_time : (idx === steps.length - 1 ? grp.end_time : '');
+      }
+    }
+    return '';
+  });
+  return techChainHTML(steps, stepTimes, '');
+}
+
+// ── Main render function ──────────────────────────────────────────────
+function renderDashboard(groups, meta) {
+  const { rawCount, duplicatesRemoved, skippedCount, filename } = meta;
+  const cleanCount = rawCount - duplicatesRemoved - skippedCount;
+
+  // Classify groups
+  const highGroups   = groups.filter(g => g.risk_level === 'HIGH');
+  const medGroups    = groups.filter(g => g.risk_level === 'MEDIUM');
+  const lowGroups    = groups.filter(g => g.risk_level === 'LOW');
+  // "multi-stage" = groups with more than one distinct MITRE technique code
+  const multiStage   = groups.filter(g => new Set(g.mitre_tags.map(codeFromTag).filter(Boolean)).size > 1);
+  const suspicious   = groups.filter(g => g.risk_score > 0 && !multiStage.includes(g));
+  const benign       = groups.filter(g => g.risk_score === 0);
+  const uniqueIPs    = new Set(groups.map(g => g.source_ip)).size;
+
+  // ── Summary tiles ───────────────────────────────────────────────
+  document.getElementById('stat-raw').textContent    = rawCount;
+  document.getElementById('stat-clean').textContent  = cleanCount;
+  document.getElementById('stat-groups').textContent = groups.length;
+  document.getElementById('stat-chains').textContent = multiStage.length;
+  const riskEl = document.getElementById('stat-risk');
+  riskEl.innerHTML = `<span class="num-red">${highGroups.length}</span> High`
+    + (medGroups.length ? ` · <span class="num-ora">${medGroups.length}</span> Med` : '')
+    + (lowGroups.length ? ` · <span class="num-grn">${lowGroups.length}</span> Low` : '');
+  document.getElementById('stat-ips').textContent = uniqueIPs;
+
+  // ── Filename tag on Summary heading ─────────────────────────────
+  const fileTagEl = document.getElementById('summary-file-tag');
+  if (fileTagEl && filename) {
+    fileTagEl.textContent = filename;
+    fileTagEl.style.display = 'inline';
+  }
+
+  // ── Before/After panel ──────────────────────────────────────────
+  document.getElementById('ba-raw').textContent    = rawCount;
+  document.getElementById('ba-groups').textContent = groups.length;
+  document.getElementById('ba-chains').textContent = multiStage.length;
+  const alertsInChains = multiStage.reduce((s, g) => s + g.alert_count, 0);
+  document.getElementById('ba-summary').innerHTML =
+    `<strong>${alertsInChains} alerts</strong> were merged into `
+    + `<strong>${multiStage.length} multi-stage attack chain${multiStage.length !== 1 ? 's' : ''}</strong>. `
+    + `Correlation converts scattered individual alerts into understandable sequences — `
+    + `reducing analyst review from ${rawCount} separate lines to `
+    + `<strong>${multiStage.length + suspicious.length} actionable group${(multiStage.length + suspicious.length) !== 1 ? 's' : ''}</strong> `
+    + `(${multiStage.length} MULTI-STAGE, ${suspicious.length} SUSPICIOUS). `
+    + `${benign.length} benign/noise group${benign.length !== 1 ? 's' : ''} deprioritised automatically.`;
+
+  // ── Data Quality panel ──────────────────────────────────────────
+  document.getElementById('dq-raw').textContent       = rawCount;
+  document.getElementById('dq-dupes').textContent     = duplicatesRemoved;
+  document.getElementById('dq-skipped').textContent   = skippedCount;
+  document.getElementById('dq-clean').textContent     = cleanCount;
+  document.getElementById('dq-groups').textContent    = groups.length;
+  document.getElementById('dq-benign').textContent    = benign.length;
+  document.getElementById('dq-suspicious').textContent= suspicious.length;
+  document.getElementById('dq-multistage').textContent= multiStage.length;
+
+  // ── Sort: HIGH first, then MEDIUM, then LOW; within tier by score desc ─
+  const sorted = [...groups].sort((a, b) => {
+    const tier = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    return (tier[a.risk_level] - tier[b.risk_level]) || (b.risk_score - a.risk_score);
+  });
+
+  // Only render cards for groups with risk_score > 0
+  const cardGroups = sorted.filter(g => g.risk_score > 0);
+
+  // ── Overview chain cards ────────────────────────────────────────
+  const rdOverviewEl = document.getElementById('chain-overview');
+  if (cardGroups.length === 0) {
+    rdOverviewEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;grid-column:1/-1">No suspicious or high-risk groups found in this file.</p>';
+  } else {
+    rdOverviewEl.innerHTML = cardGroups.map(grp => {
+      const badgeClass = grp.risk_level === 'HIGH' ? 'badge-high' : grp.risk_level === 'MEDIUM' ? 'badge-medium' : 'badge-low';
+      const scoreColor = grp.risk_level === 'HIGH' ? 'num-red' : grp.risk_level === 'MEDIUM' ? 'num-ora' : 'num-grn';
+      const riskClass  = grp.risk_level === 'HIGH' ? 'risk-high' : grp.risk_level === 'MEDIUM' ? 'risk-medium' : 'risk-low';
+      const steps      = stepsFromGroup(grp);
+      const dur        = durationStr(grp.start_time, grp.end_time);
+      return `
+      <div class="chain-card ${riskClass}">
+        <div class="chain-card-top">
+          <span class="chain-ip">${grp.source_ip}</span>
+          <span class="badge ${badgeClass}">${grp.risk_level}</span>
+        </div>
+        <div class="chain-meta">
+          <div class="chain-meta-item"><div class="mv ${scoreColor}">${grp.risk_score}/${MAX_SCORE}</div><div class="mk">Score</div></div>
+          <div class="chain-meta-item"><div class="mv">${dur}</div><div class="mk">Duration</div></div>
+          <div class="chain-meta-item"><div class="mv">${grp.alert_count}</div><div class="mk">Alerts</div></div>
+          <div class="chain-meta-item"><div class="mv">${steps.length}</div><div class="mk">Techniques</div></div>
+        </div>
+        <div class="score-bar-row">
+          <div class="score-label"><span>Risk Score</span><span>${grp.risk_score}/${MAX_SCORE}</span></div>
+          <div class="score-track"><div class="score-fill" style="width:${pct(grp.risk_score)}%"></div></div>
+        </div>
+        <div class="tech-chain">${techChainFromGroup(grp, steps)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Detailed full cards ─────────────────────────────────────────
+  const rdDetailEl = document.getElementById('chain-detail');
+  if (cardGroups.length === 0) {
+    rdDetailEl.innerHTML = '';
+  } else {
+    rdDetailEl.innerHTML = cardGroups.map(grp => {
+      const badgeClass = grp.risk_level === 'HIGH' ? 'badge-high' : grp.risk_level === 'MEDIUM' ? 'badge-medium' : 'badge-low';
+      const steps      = stepsFromGroup(grp);
+      const dur        = durationStr(grp.start_time, grp.end_time);
+      const fcObj      = forecastObjFromGroup(grp);
+      const corrEl     = corrEvidenceFromGroup(grp, steps);
+      return fullCardHTML({
+        ip:         grp.source_ip,
+        badge:      grp.risk_level,
+        badgeClass,
+        score:      grp.risk_score,
+        duration:   dur,
+        alertCount: grp.alert_count,
+        steps,
+        times:      null,
+        date:       '',
+        bottomLine: bottomLineFromGroup(grp),
+        forecast:   grp.forecast.length ? fcObj : null,
+        actions:    actionsFromGroup(grp),
+        corrEl,
+      });
+    }).join('');
+  }
+
+  // Update topnav title tooltip
+  const subEl = document.querySelector('.topnav-title');
+  if (subEl) subEl.title = `${filename} · loaded ${new Date().toLocaleString()}`;
+
+  // Reveal analysis sections (hidden until data is loaded)
+  showAnalysisSections();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CSV Upload handler
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('csv-file-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const statusEl    = document.getElementById('csv-status');
+  const loadingEl   = document.getElementById('loading-overlay');
+  const datasetEl   = document.getElementById('topnav-dataset');
+  const dsLabelEl   = document.getElementById('ds-label-text');
+
+  // Reset status
+  statusEl.className = '';
+  statusEl.style.display = 'none';
+  loadingEl.classList.add('visible');
+
+  const reader = new FileReader();
+
+  reader.onload = function(evt) {
+    // Wrap in setTimeout(0) so the loading spinner paints before JS runs
+    setTimeout(function() {
+      try {
+        const text  = evt.target.result;
+        const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+
+        // ── Empty file guard ───────────────────────────────────────
+        if (lines.length < 2) {
+          throw new Error('File appears empty or has no data rows.');
+        }
+
+        // ── Column validation ──────────────────────────────────────
+        const headers     = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const colSourceIp  = headers.indexOf('source_ip');
+        const colTimestamp = headers.indexOf('timestamp');
+        const colAlertType = headers.indexOf('alert_type');
+
+        const missing = [];
+        if (colSourceIp  < 0) missing.push('source_ip');
+        if (colTimestamp < 0) missing.push('timestamp');
+        if (colAlertType < 0) missing.push('alert_type');
+        if (missing.length) {
+          throw new Error(`Required column${missing.length > 1 ? 's' : ''} not found: ${missing.join(', ')}. `
+            + `Make sure the header row contains: source_ip, timestamp, alert_type`);
+        }
+
+        // ── Parse rows ─────────────────────────────────────────────
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cells = lines[i].split(',').map(c => c.trim());
+          rows.push({
+            source_ip:  cells[colSourceIp],
+            timestamp:  cells[colTimestamp],
+            alert_type: cells[colAlertType],
+          });
+        }
+
+        console.log('Parsed CSV rows:', rows);
+
+        // ── Pipeline ───────────────────────────────────────────────
+        const { groups, duplicatesRemoved, skippedCount } = correlateAlerts(rows);
+        tagWithMitre(groups);
+        scoreAndForecast(groups);
+
+        console.log(
+          `Correlation complete — ${groups.length} group(s) | ` +
+          `${duplicatesRemoved} duplicate(s) removed | ` +
+          `${skippedCount} row(s) skipped (missing timestamp)`
+        );
+        console.log('Correlated groups (scored + forecast):', groups);
+
+        // ── Re-render dashboard ────────────────────────────────────
+        renderDashboard(groups, {
+          rawCount: rows.length,
+          duplicatesRemoved,
+          skippedCount,
+          filename: file.name,
+        });
+
+        // Update topnav dataset pill
+        if (datasetEl && dsLabelEl) {
+          dsLabelEl.textContent = `${file.name}  ·  ${rows.length} rows  ·  ${groups.length} groups`;
+          datasetEl.classList.add('loaded');
+        }
+
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className   = 'error';
+        // Show error in dataset pill
+        if (datasetEl && dsLabelEl) {
+          dsLabelEl.textContent = `Error: ${err.message.substring(0, 60)}`;
+          datasetEl.classList.remove('loaded');
+        }
+        console.error('CSV upload error:', err);
+      } finally {
+        loadingEl.classList.remove('visible');
+      }
+    }, 0);
+  };
+
+  reader.onerror = function() {
+    loadingEl.classList.remove('visible');
+    statusEl.textContent = 'Error: could not read the file.';
+    statusEl.className   = 'error';
+    if (datasetEl && dsLabelEl) {
+      dsLabelEl.textContent = 'Error: could not read file';
+      datasetEl.classList.remove('loaded');
+    }
+  };
+
+  reader.readAsText(file);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// LIVE CLOCK
+// ═══════════════════════════════════════════════════════════════════
+(function tickClock() {
+  const el = document.getElementById('live-clock');
+  if (!el) return;
+  function update() {
+    const now = new Date();
+    el.textContent = now.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })
+      + ' ' + now.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  update();
+  setInterval(update, 1000);
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// SIDEBAR — active link on click + scroll-based highlight
+// ═══════════════════════════════════════════════════════════════════
+document.querySelectorAll('.sidebar-nav a').forEach(link => {
+  link.addEventListener('click', function() {
+    document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// Highlight sidebar link when its section scrolls into view
+(function initScrollSpy() {
+  const sections = ['sec-overview','sec-mitre','sec-chains','sec-about'];
+  const links = {};
+  sections.forEach(id => {
+    links[id] = document.querySelector(`.sidebar-nav a[href="#${id}"]`);
+  });
+  window.addEventListener('scroll', function() {
+    let current = sections[0];
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.getBoundingClientRect().top <= 80) current = id;
+    });
+    sections.forEach(id => {
+      if (links[id]) links[id].classList.toggle('active', id === current);
+    });
+  }, { passive: true });
+})();
+
+</script>
+
+</body>
+</html>
