@@ -13,14 +13,14 @@ team:
   track: "AI"                            # REQUIRED — one of: AI | DevOps | Sustainability | Open
   lead:
     name: "Parth Munani"                           # REQUIRED — e.g., "Alice Chen"
-    email: "26dce@charusat.edu.in"                          # REQUIRED — e.g., "alice.chen@ibm.com"
-  members:
-    - name: ""                         # REQUIRED — Team member 1
-      email: ""
-    - name: ""                         # Add more members by copying the two lines above
-      email: ""
-    - name: ""
-      email: ""
+    email: "26dce053@charusat.edu.in"                          # REQUIRED — e.g., "alice.chen@ibm.com"
+  members:3
+    - name: "Pari Desai"                         # REQUIRED — Team member 1
+      email: "26dce016@charusat.edu.in"
+    - name: "Prinsi Babariya"                         # Add more members by copying the two lines above
+      email: "26dce003@charusat.edu.in"
+    - name: "Kartik Jha"
+      email: "26dce035@charusat.edu.in"
 
 submission:
   title: "Threat Correlation & Forecasting Assistant"                            # REQUIRED — Project display name, e.g., "SmartOps Dashboard"
